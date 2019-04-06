@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"reflect"
-	"unsafe"
 
 	"github.com/jfreymuth/pulse"
 )
@@ -18,17 +16,13 @@ func main() {
 	}
 	defer c.Close()
 
-	_, err = c.CreatePlayback(44100, func(buf []byte) {
-		h := *(*reflect.SliceHeader)(unsafe.Pointer(&buf))
-		h.Len /= 4
-		h.Cap /= 4
-		out := *(*[]float32)(unsafe.Pointer(&h))
-		synth(out)
-	})
+	stream, err := c.NewPlayback(synth)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
+
+	stream.Start()
 
 	fmt.Print("Press enter to stop...")
 	os.Stdin.Read([]byte{0})

@@ -16,11 +16,13 @@ func main() {
 	defer c.Close()
 
 	file := CreateFile("out.wav", 44100, 1)
-	_, err = c.CreateRecord(44100, func(buf []byte) { file.out.Write(buf) })
+	stream, err := c.NewRecord(file.Write)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
+
+	stream.Start()
 
 	fmt.Print("Press enter to stop...")
 	os.Stdin.Read([]byte{0})
