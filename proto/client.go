@@ -49,12 +49,16 @@ type AwaitReply struct {
 	reply chan<- interface{}
 }
 
-func (c *Client) Request(req RequestArgs, resp interface{}) error {
+func (c *Client) Request(req RequestArgs, rpl Reply) error {
+	if rpl != nil && req.command() != rpl.IsReplyTo() {
+		panic("pulse: wrong reply type")
+	}
+
 	c.replyM.Lock()
 	tag := c.nextID
 	c.nextID++
 	reply := make(chan interface{}, 1)
-	c.awaitReply[tag] = AwaitReply{resp, reply}
+	c.awaitReply[tag] = AwaitReply{rpl, reply}
 	c.replyM.Unlock()
 
 	var buf bytes.Buffer

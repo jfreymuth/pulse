@@ -126,6 +126,7 @@ const (
 )
 
 type RequestArgs interface{ command() uint32 }
+type Reply interface{ IsReplyTo() uint32 }
 
 type CreatePlaybackStream struct {
 	SampleSpec
@@ -563,29 +564,23 @@ type GetSampleInfoReply struct {
 	Properties map[string]string "13"
 }
 
-// Reply type is *[]*GetSinkInfoReply
 type GetSinkInfoList struct{}
-
-// Reply type is *[]*GetSourceInfoReply
 type GetSourceInfoList struct{}
-
-// Reply type is *[]*GetModuleInfoReply
 type GetModuleInfoList struct{}
-
-// Reply type is *[]*GetClientInfoReply
 type GetClientInfoList struct{}
-
-// Reply type is *[]*GetCardInfoReply
 type GetCardInfoList struct{}
-
-// Reply type is *[]*GetSinkInputInfoReply
 type GetSinkInputInfoList struct{}
-
-// Reply type is *[]*GetSourceOutputInfoReply
 type GetSourceOutputInfoList struct{}
-
-// Reply type is *[]*GetSampleInfoReply
 type GetSampleInfoList struct{}
+
+type GetSinkInfoListReply []*GetSinkInfoReply
+type GetSourceInfoListReply []*GetSourceInfoReply
+type GetModuleInfoListReply []*GetModuleInfoReply
+type GetClientInfoListReply []*GetClientInfoReply
+type GetCardInfoListReply []*GetCardInfoReply
+type GetSinkInputInfoListReply []*GetSinkInputInfoReply
+type GetSourceOutputInfoListReply []*GetSourceOutputInfoReply
+type GetSampleInfoListReply []*GetSampleInfoReply
 
 type Subscribe struct{ Mask uint32 }
 
@@ -882,6 +877,37 @@ func (*SetSourcePort) command() uint32                  { return OpSetSourcePort
 func (*SetSourceOutputVolume) command() uint32          { return OpSetSourceOutputVolume }
 func (*SetSourceOutputMute) command() uint32            { return OpSetSourceOutputMute }
 func (*SetPortLatencyOffset) command() uint32           { return OpSetPortLatencyOffset }
+
+func (*CreatePlaybackStreamReply) IsReplyTo() uint32        { return OpCreatePlaybackStream }
+func (*CreateRecordStreamReply) IsReplyTo() uint32          { return OpCreateRecordStream }
+func (*AuthReply) IsReplyTo() uint32                        { return OpAuth }
+func (*SetClientNameReply) IsReplyTo() uint32               { return OpSetClientName }
+func (*LookupSinkReply) IsReplyTo() uint32                  { return OpLookupSink }
+func (*LookupSourceReply) IsReplyTo() uint32                { return OpLookupSource }
+func (*StatReply) IsReplyTo() uint32                        { return OpStat }
+func (*GetPlaybackLatencyReply) IsReplyTo() uint32          { return OpGetPlaybackLatency }
+func (*CreateUploadStreamReply) IsReplyTo() uint32          { return OpCreateUploadStream }
+func (*GetServerInfoReply) IsReplyTo() uint32               { return OpGetServerInfo }
+func (*GetSinkInfoReply) IsReplyTo() uint32                 { return OpGetSinkInfo }
+func (*GetSinkInfoListReply) IsReplyTo() uint32             { return OpGetSinkInfoList }
+func (*GetSourceInfoReply) IsReplyTo() uint32               { return OpGetSourceInfo }
+func (*GetSourceInfoListReply) IsReplyTo() uint32           { return OpGetSourceInfoList }
+func (*GetModuleInfoReply) IsReplyTo() uint32               { return OpGetModuleInfo }
+func (*GetModuleInfoListReply) IsReplyTo() uint32           { return OpGetModuleInfoList }
+func (*GetClientInfoReply) IsReplyTo() uint32               { return OpGetClientInfo }
+func (*GetClientInfoListReply) IsReplyTo() uint32           { return OpGetClientInfoList }
+func (*GetSinkInputInfoReply) IsReplyTo() uint32            { return OpGetSinkInputInfo }
+func (*GetSinkInputInfoListReply) IsReplyTo() uint32        { return OpGetSinkInputInfoList }
+func (*GetSourceOutputInfoReply) IsReplyTo() uint32         { return OpGetSourceOutputInfo }
+func (*GetSourceOutputInfoListReply) IsReplyTo() uint32     { return OpGetSourceOutputInfoList }
+func (*GetSampleInfoReply) IsReplyTo() uint32               { return OpGetSampleInfo }
+func (*GetSampleInfoListReply) IsReplyTo() uint32           { return OpGetSampleInfoList }
+func (*LoadModuleReply) IsReplyTo() uint32                  { return OpLoadModule }
+func (*GetRecordLatencyReply) IsReplyTo() uint32            { return OpGetRecordLatency }
+func (*SetPlaybackStreamBufferAttrReply) IsReplyTo() uint32 { return OpSetPlaybackStreamBufferAttr }
+func (*SetRecordStreamBufferAttrReply) IsReplyTo() uint32   { return OpSetRecordStreamBufferAttr }
+func (*GetCardInfoReply) IsReplyTo() uint32                 { return OpGetCardInfo }
+func (*GetCardInfoListReply) IsReplyTo() uint32             { return OpGetCardInfoList }
 
 // SERVER -> CLIENT MESSAGES
 
