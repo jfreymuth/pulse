@@ -27,11 +27,16 @@ func NewClient() (*Client, error) {
 	socketPath := fmt.Sprint("/run/user/", os.Getuid(), "/pulse/native")
 	if pathRaw, ok := os.LookupEnv("PULSE_SERVER"); ok {
 		path := strings.SplitN(pathRaw, ":", 2)
-		if len(path) != 2 {
-			return nil, errors.New("no network type in PULSE_SERVER")
+		switch len(path) {
+		case 1:
+			// If the network type is not specified, it should be handled as unix socket.
+			socketPath = path[0]
+		case 2:
+			socketNetwork = path[0]
+			socketPath = path[1]
+		default:
+			return nil, errors.New("invalid PULSE_SERVER string")
 		}
-		socketNetwork = path[0]
-		socketPath = path[1]
 	}
 
 	conn, err := net.Dial(socketNetwork, socketPath)
