@@ -12,16 +12,19 @@ type RecordStream struct {
 	cb32 func([]int32)
 	cbf  func([]float32)
 
-	cmap   proto.ChannelMap
-	rate   uint32
-	format byte
+	cmap          proto.ChannelMap
+	rate          uint32
+	format        byte
+	fragSize      uint32
+	adjustLatency bool
 }
 
 func (c *Client) NewRecord(cb interface{}, opts ...RecordOption) (*RecordStream, error) {
 	r := &RecordStream{
-		c:    c,
-		cmap: proto.ChannelMap{proto.ChannelMono},
-		rate: 44100,
+		c:        c,
+		cmap:     proto.ChannelMap{proto.ChannelMono},
+		rate:     44100,
+		fragSize: 0xFFFFFFFF,
 	}
 	for _, opt := range opts {
 		opt(r)
@@ -61,9 +64,10 @@ func (c *Client) NewRecord(cb interface{}, opts ...RecordOption) (*RecordStream,
 		SourceIndex:        0xFFFFFFFF,
 		BufferMaxLength:    0xFFFFFFFF,
 		Corked:             true,
-		BufferFragSize:     0xFFFFFFFF,
+		BufferFragSize:     r.fragSize,
 		ChannelVolumes:     cvol,
 		DirectOnInputIndex: 0xFFFFFFFF,
+		AdjustLatency:      r.adjustLatency,
 	}, &reply)
 	if err != nil {
 		return nil, err
@@ -138,5 +142,17 @@ func RecordChannels(m proto.ChannelMap) RecordOption {
 func RecordSampleRate(rate int) RecordOption {
 	return func(r *RecordStream) {
 		r.rate = uint32(rate)
+	}
+}
+
+func RecordBufferFragmentSize(size uint32) RecordOption {
+	return func(r *RecordStream) {
+		r.fragSize = size
+	}
+}
+
+func RecordAdjustLatency(adjust bool) RecordOption {
+	return func(r *RecordStream) {
+		r.adjustLatency = adjust
 	}
 }
