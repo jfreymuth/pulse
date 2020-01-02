@@ -1,11 +1,13 @@
 package pulse
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"os"
 	"path"
+	"strings"
 	"sync"
 
 	"github.com/jfreymuth/pulse/proto"
@@ -21,7 +23,18 @@ type Client struct {
 }
 
 func NewClient() (*Client, error) {
-	conn, err := net.Dial("unix", fmt.Sprint("/run/user/", os.Getuid(), "/pulse/native"))
+	socketNetwork := "unix"
+	socketPath := fmt.Sprint("/run/user/", os.Getuid(), "/pulse/native")
+	if pathRaw, ok := os.LookupEnv("PULSE_SERVER"); ok {
+		path := strings.SplitN(pathRaw, ":", 2)
+		if len(path) != 2 {
+			return nil, errors.New("no network type in PULSE_SERVER")
+		}
+		socketNetwork = path[0]
+		socketPath = path[1]
+	}
+
+	conn, err := net.Dial(socketNetwork, socketPath)
 	if err != nil {
 		return nil, err
 	}
@@ -51,13 +64,27 @@ func NewClient() (*Client, error) {
 	}
 	c.c.Open(conn)
 
-	cookie, err := ioutil.ReadFile(os.Getenv("HOME") + "/.config/pulse/cookie")
+	cookiePath := os.Getenv("HOME") + "/.config/pulse/cookie"
+	if path, ok := os.LookupEnv("PULSE_COOKIE"); ok {
+		cookiePath = path
+	}
+
+	cookie, err := ioutil.ReadFile(cookiePath)
 	if err != nil {
-		c.conn.Close()
-		return nil, err
+		if !os.IsNotExist(err) {
+			c.conn.Close()
+			return nil, err
+		}
+		// If the server is launched with auth-anonymous=1,
+		// any 256 bytes cookie will be accepted.
+		cookie = make([]byte, 256)
 	}
 	var authReply proto.AuthReply
-	err = c.c.Request(&proto.Auth{Version: c.c.Version(), Cookie: cookie}, &authReply)
+	err = c.c.Request(
+		&proto.Auth{
+			Version: c.c.Version(),
+			Cookie:  cookie,
+		}, &authReply)
 	if err != nil {
 		c.conn.Close()
 		return nil, err
