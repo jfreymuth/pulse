@@ -12,6 +12,7 @@ type RecordStream struct {
 	cb32 func([]int32)
 	cbf  func([]float32)
 
+	sourceIndex   uint32
 	cmap          proto.ChannelMap
 	rate          uint32
 	format        byte
@@ -21,10 +22,11 @@ type RecordStream struct {
 
 func (c *Client) NewRecord(cb interface{}, opts ...RecordOption) (*RecordStream, error) {
 	r := &RecordStream{
-		c:        c,
-		cmap:     proto.ChannelMap{proto.ChannelMono},
-		rate:     44100,
-		fragSize: 0xFFFFFFFF,
+		c:           c,
+		sourceIndex: 0xFFFFFFFF,
+		cmap:        proto.ChannelMap{proto.ChannelMono},
+		rate:        44100,
+		fragSize:    0xFFFFFFFF,
 	}
 	for _, opt := range opts {
 		opt(r)
@@ -61,7 +63,7 @@ func (c *Client) NewRecord(cb interface{}, opts ...RecordOption) (*RecordStream,
 	err := c.c.Request(&proto.CreateRecordStream{
 		SampleSpec:         proto.SampleSpec{Format: format, Channels: byte(len(r.cmap)), Rate: r.rate},
 		ChannelMap:         r.cmap,
-		SourceIndex:        0xFFFFFFFF,
+		SourceIndex:        r.sourceIndex,
 		BufferMaxLength:    0xFFFFFFFF,
 		Corked:             true,
 		BufferFragSize:     r.fragSize,
@@ -154,5 +156,11 @@ func RecordBufferFragmentSize(size uint32) RecordOption {
 func RecordAdjustLatency(adjust bool) RecordOption {
 	return func(r *RecordStream) {
 		r.adjustLatency = adjust
+	}
+}
+
+func RecordSourceIndex(index uint32) RecordOption {
+	return func(p *RecordStream) {
+		p.sourceIndex = index
 	}
 }
