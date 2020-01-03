@@ -183,35 +183,35 @@ func (c *Client) parseInfoList(value interface{}, length int) {
 	start := c.r.pos
 	for c.r.pos-start < length {
 		switch value := value.(type) {
-		case *[]*GetSinkInfoReply:
+		case *GetSinkInfoListReply:
 			var v GetSinkInfoReply
 			c.r.value(&v, c.v)
 			*value = append(*value, &v)
-		case *[]*GetSourceInfoReply:
+		case *GetSourceInfoListReply:
 			var v GetSourceInfoReply
 			c.r.value(&v, c.v)
 			*value = append(*value, &v)
-		case *[]*GetModuleInfoReply:
+		case *GetModuleInfoListReply:
 			var v GetModuleInfoReply
 			c.r.value(&v, c.v)
 			*value = append(*value, &v)
-		case *[]*GetClientInfoReply:
+		case *GetClientInfoListReply:
 			var v GetClientInfoReply
 			c.r.value(&v, c.v)
 			*value = append(*value, &v)
-		case *[]*GetCardInfoReply:
+		case *GetCardInfoListReply:
 			var v GetCardInfoReply
 			c.r.value(&v, c.v)
 			*value = append(*value, &v)
-		case *[]*GetSinkInputInfoReply:
+		case *GetSinkInputInfoListReply:
 			var v GetSinkInputInfoReply
 			c.r.value(&v, c.v)
 			*value = append(*value, &v)
-		case *[]*GetSourceOutputInfoReply:
+		case *GetSourceOutputInfoListReply:
 			var v GetSourceOutputInfoReply
 			c.r.value(&v, c.v)
 			*value = append(*value, &v)
-		case *[]*GetSampleInfoReply:
+		case *GetSampleInfoListReply:
 			var v GetSampleInfoReply
 			c.r.value(&v, c.v)
 			*value = append(*value, &v)
