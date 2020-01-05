@@ -19,20 +19,35 @@ type Client struct {
 	mu       sync.Mutex
 	playback map[uint32]*PlaybackStream
 	record   map[uint32]*RecordStream
+
+	server    string
+	appName   string
+	mediaName string
 }
 
-func NewClient() (*Client, error) {
+func NewClient(opts ...ClientOption) (*Client, error) {
 	servers := []serverString{
 		{
 			protocol: "unix",
 			addr:     fmt.Sprint("/run/user/", os.Getuid(), "/pulse/native"),
 		},
 	}
-	if serverRaw, ok := os.LookupEnv("PULSE_SERVER"); ok {
+
+	c := &Client{
+		appName:   path.Base(os.Args[0]),
+		mediaName: "go audio",
+	}
+	for _, opt := range opts {
+		opt(c)
+	}
+
+	if c.server != "" {
+		servers = parseServerString(c.server)
+	} else if serverRaw, ok := os.LookupEnv("PULSE_SERVER"); ok {
 		servers = parseServerString(serverRaw)
-		if len(servers) == 0 {
-			return nil, errors.New("no valid pulse server")
-		}
+	}
+	if len(servers) == 0 {
+		return nil, errors.New("no valid pulse server")
 	}
 
 	localname, err := os.Hostname()
@@ -51,7 +66,8 @@ func NewClient() (*Client, error) {
 			continue
 		}
 
-		c := &Client{conn: conn}
+		c.conn = conn
+
 		c.playback = make(map[uint32]*PlaybackStream)
 		c.record = make(map[uint32]*RecordStream)
 		c.c.Callback = func(msg interface{}) {
@@ -106,8 +122,8 @@ func NewClient() (*Client, error) {
 		c.c.SetVersion(authReply.Version)
 
 		err = c.c.Request(&proto.SetClientName{Props: map[string]string{
-			"media.name":                 "go audio",
-			"application.name":           path.Base(os.Args[0]),
+			"media.name":                 c.mediaName,
+			"application.name":           c.appName,
 			"application.process.id":     fmt.Sprintf("%d", os.Getpid()),
 			"application.process.binary": os.Args[0],
 			"window.x11.display":         os.Getenv("DISPLAY"),
@@ -125,4 +141,19 @@ func NewClient() (*Client, error) {
 
 func (c *Client) Close() {
 	c.conn.Close()
+}
+
+type ClientOption func(*Client)
+
+func ClientApplicationName(name string) ClientOption {
+	return func(c *Client) { c.appName = name }
+}
+
+func ClientMediaName(name string) ClientOption {
+	return func(c *Client) { c.mediaName = name }
+}
+
+// see https://www.freedesktop.org/wiki/Software/PulseAudio/Documentation/User/ServerStrings/
+func ClientServerString(s string) ClientOption {
+	return func(c *Client) { c.server = s }
 }
