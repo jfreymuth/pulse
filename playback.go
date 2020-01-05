@@ -101,19 +101,19 @@ func (p *PlaybackStream) buffer(n int) []byte {
 }
 
 func (p *PlaybackStream) Start() {
-	p.c.c.Request(&proto.FlushPlaybackStream{p.index}, nil)
-	p.c.c.Request(&proto.CorkPlaybackStream{p.index, false}, nil)
+	p.c.c.Request(&proto.FlushPlaybackStream{StreamIndex: p.index}, nil)
+	p.c.c.Request(&proto.CorkPlaybackStream{StreamIndex: p.index, Corked: false}, nil)
 	p.running = true
 	p.c.c.Send(p.index, p.buffer(int(p.bufSize)))
 }
 
 func (p *PlaybackStream) Stop() {
-	p.c.c.Request(&proto.CorkPlaybackStream{p.index, true}, nil)
+	p.c.c.Request(&proto.CorkPlaybackStream{StreamIndex: p.index, Corked: true}, nil)
 	p.running = false
 }
 
 func (p *PlaybackStream) Resume() {
-	p.c.c.Request(&proto.CorkPlaybackStream{p.index, false}, nil)
+	p.c.c.Request(&proto.CorkPlaybackStream{StreamIndex: p.index, Corked: false}, nil)
 	p.running = true
 }
 

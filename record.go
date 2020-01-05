@@ -95,18 +95,18 @@ func (r *RecordStream) write(buf []byte) {
 }
 
 func (r *RecordStream) Start() {
-	r.c.c.Request(&proto.FlushRecordStream{r.index}, nil)
-	r.c.c.Request(&proto.CorkRecordStream{r.index, false}, nil)
+	r.c.c.Request(&proto.FlushRecordStream{StreamIndex: r.index}, nil)
+	r.c.c.Request(&proto.CorkRecordStream{StreamIndex: r.index, Corked: false}, nil)
 	r.running = true
 }
 
 func (r *RecordStream) Stop() {
-	r.c.c.Request(&proto.CorkRecordStream{r.index, true}, nil)
+	r.c.c.Request(&proto.CorkRecordStream{StreamIndex: r.index, Corked: true}, nil)
 	r.running = false
 }
 
 func (r *RecordStream) Resume() {
-	r.c.c.Request(&proto.CorkRecordStream{r.index, false}, nil)
+	r.c.c.Request(&proto.CorkRecordStream{StreamIndex: r.index, Corked: false}, nil)
 	r.running = true
 }
 

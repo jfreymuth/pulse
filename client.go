@@ -105,7 +105,7 @@ func NewClient() (*Client, error) {
 		}
 		c.c.SetVersion(authReply.Version)
 
-		err = c.c.Request(&proto.SetClientName{map[string]string{
+		err = c.c.Request(&proto.SetClientName{Props: map[string]string{
 			"media.name":                 "go audio",
 			"application.name":           path.Base(os.Args[0]),
 			"application.process.id":     fmt.Sprintf("%d", os.Getpid()),
