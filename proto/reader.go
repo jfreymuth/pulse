@@ -101,7 +101,7 @@ func (p *ProtocolReader) string() string {
 	const maxLength = 1024
 	for i := 0; i < maxLength; i++ {
 		if i >= p.buffered {
-			p.fill(p.buffered + 128)
+			p.fill(p.buffered + 1)
 		}
 		if p.err != nil {
 			return ""
