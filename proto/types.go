@@ -1,5 +1,7 @@
 package proto
 
+const Undefined = 0xFFFFFFFF
+
 const (
 	FormatUint8     = 0
 	FormatInt16LE   = 3

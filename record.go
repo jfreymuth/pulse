@@ -23,10 +23,10 @@ type RecordStream struct {
 func (c *Client) NewRecord(cb interface{}, opts ...RecordOption) (*RecordStream, error) {
 	r := &RecordStream{
 		c:           c,
-		sourceIndex: 0xFFFFFFFF,
+		sourceIndex: proto.Undefined,
 		cmap:        proto.ChannelMap{proto.ChannelMono},
 		rate:        44100,
-		fragSize:    0xFFFFFFFF,
+		fragSize:    proto.Undefined,
 	}
 	for _, opt := range opts {
 		opt(r)
@@ -64,11 +64,11 @@ func (c *Client) NewRecord(cb interface{}, opts ...RecordOption) (*RecordStream,
 		SampleSpec:         proto.SampleSpec{Format: format, Channels: byte(len(r.cmap)), Rate: r.rate},
 		ChannelMap:         r.cmap,
 		SourceIndex:        r.sourceIndex,
-		BufferMaxLength:    0xFFFFFFFF,
+		BufferMaxLength:    proto.Undefined,
 		Corked:             true,
 		BufferFragSize:     r.fragSize,
 		ChannelVolumes:     cvol,
-		DirectOnInputIndex: 0xFFFFFFFF,
+		DirectOnInputIndex: proto.Undefined,
 		AdjustLatency:      r.adjustLatency,
 	}, &reply)
 	if err != nil {

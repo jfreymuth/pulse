@@ -24,10 +24,10 @@ type PlaybackStream struct {
 func (c *Client) NewPlayback(cb interface{}, opts ...PlaybackOption) (*PlaybackStream, error) {
 	p := &PlaybackStream{
 		c:         c,
-		sinkIndex: 0xFFFFFFFF,
+		sinkIndex: proto.Undefined,
 		cmap:      proto.ChannelMap{proto.ChannelMono},
 		rate:      44100,
-		bufSize:   0xFFFFFFFF,
+		bufSize:   proto.Undefined,
 	}
 	for _, opt := range opts {
 		opt(p)
@@ -65,11 +65,11 @@ func (c *Client) NewPlayback(cb interface{}, opts ...PlaybackOption) (*PlaybackS
 		SampleSpec:            proto.SampleSpec{Format: format, Channels: byte(len(p.cmap)), Rate: p.rate},
 		ChannelMap:            p.cmap,
 		SinkIndex:             p.sinkIndex,
-		BufferMaxLength:       0xFFFFFFFF,
+		BufferMaxLength:       proto.Undefined,
 		Corked:                true,
 		BufferTargetLength:    p.bufSize,
-		BufferPrebufferLength: 0xFFFFFFFF,
-		BufferMinimumRequest:  0xFFFFFFFF,
+		BufferPrebufferLength: proto.Undefined,
+		BufferMinimumRequest:  proto.Undefined,
 		ChannelVolumes:        cvol,
 	}, &reply)
 	if err != nil {
