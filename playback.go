@@ -14,18 +14,20 @@ type PlaybackStream struct {
 	cb32 func([]int32)
 	cbf  func([]float32)
 
-	cmap    proto.ChannelMap
-	rate    uint32
-	bufSize uint32
-	format  byte
+	sinkIndex uint32
+	cmap      proto.ChannelMap
+	rate      uint32
+	bufSize   uint32
+	format    byte
 }
 
 func (c *Client) NewPlayback(cb interface{}, opts ...PlaybackOption) (*PlaybackStream, error) {
 	p := &PlaybackStream{
-		c:       c,
-		cmap:    proto.ChannelMap{proto.ChannelMono},
-		rate:    44100,
-		bufSize: 0xFFFFFFFF,
+		c:         c,
+		sinkIndex: 0xFFFFFFFF,
+		cmap:      proto.ChannelMap{proto.ChannelMono},
+		rate:      44100,
+		bufSize:   0xFFFFFFFF,
 	}
 	for _, opt := range opts {
 		opt(p)
@@ -62,7 +64,7 @@ func (c *Client) NewPlayback(cb interface{}, opts ...PlaybackOption) (*PlaybackS
 	err := c.c.Request(&proto.CreatePlaybackStream{
 		SampleSpec:            proto.SampleSpec{Format: format, Channels: byte(len(p.cmap)), Rate: p.rate},
 		ChannelMap:            p.cmap,
-		SinkIndex:             0xFFFFFFFF,
+		SinkIndex:             p.sinkIndex,
 		BufferMaxLength:       0xFFFFFFFF,
 		Corked:                true,
 		BufferTargetLength:    p.bufSize,
@@ -170,5 +172,11 @@ func PlaybackSampleRate(rate int) PlaybackOption {
 func PlaybackBufferSize(bytes int) PlaybackOption {
 	return func(p *PlaybackStream) {
 		p.bufSize = uint32(bytes)
+	}
+}
+
+func PlaybackSinkIndex(index uint32) PlaybackOption {
+	return func(p *PlaybackStream) {
+		p.sinkIndex = index
 	}
 }
