@@ -7,7 +7,8 @@ type PlaybackStream struct {
 	index   uint32
 	running bool
 
-	buf []byte
+	buf            []byte
+	bytesPerSample int
 
 	cb8  func([]byte)
 	cb16 func([]int16)
@@ -32,25 +33,30 @@ func (c *Client) NewPlayback(cb interface{}, opts ...PlaybackOption) (*PlaybackS
 			BufferMinimumRequest:  proto.Undefined,
 		},
 	}
-	for _, opt := range opts {
-		opt(p)
-	}
 
 	switch cb := cb.(type) {
 	case func([]byte):
 		p.cb8 = cb
 		p.createRequest.Format = proto.FormatUint8
+		p.bytesPerSample = 1
 	case func([]int16):
 		p.cb16 = cb
 		p.createRequest.Format = formatI16
+		p.bytesPerSample = 2
 	case func([]int32):
 		p.cb32 = cb
 		p.createRequest.Format = formatI32
+		p.bytesPerSample = 4
 	case func([]float32):
 		p.cbf = cb
 		p.createRequest.Format = formatF32
+		p.bytesPerSample = 4
 	default:
 		panic("pulse: invalid callback type")
+	}
+
+	for _, opt := range opts {
+		opt(p)
 	}
 
 	cvol := make(proto.ChannelVolumes, len(p.createRequest.ChannelMap))
@@ -117,13 +123,7 @@ func (p *PlaybackStream) Channels() int {
 
 func (p *PlaybackStream) BufferSize() int {
 	s := int(p.createReply.BufferTargetLength) / int(p.createReply.Channels)
-	switch {
-	case p.cb16 != nil:
-		s /= 2
-	case p.cb8 == nil:
-		s /= 4
-	}
-	return s
+	return s / p.bytesPerSample
 }
 
 func (p *PlaybackStream) BufferSizeBytes() int {
@@ -167,5 +167,14 @@ func PlaybackBufferSize(bytes int) PlaybackOption {
 func PlaybackSink(sink *Sink) PlaybackOption {
 	return func(p *PlaybackStream) {
 		p.createRequest.SinkIndex = sink.info.SinkIndex
+	}
+}
+
+func PlaybackLowLatency(sink *Sink) PlaybackOption {
+	return func(p *PlaybackStream) {
+		p.createRequest.SinkIndex = sink.info.SinkIndex
+		p.createRequest.BufferTargetLength = uint32(uint64(sink.info.RequestedLatency)*uint64(p.createRequest.Rate)/1000000) * uint32(p.bytesPerSample)
+		p.createRequest.BufferMaxLength = 2 * p.createRequest.BufferTargetLength
+		p.createRequest.AdjustLatency = true
 	}
 }
