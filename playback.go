@@ -14,69 +14,55 @@ type PlaybackStream struct {
 	cb32 func([]int32)
 	cbf  func([]float32)
 
-	sinkIndex uint32
-	cmap      proto.ChannelMap
-	rate      uint32
-	bufSize   uint32
-	format    byte
+	createRequest proto.CreatePlaybackStream
+	createReply   proto.CreatePlaybackStreamReply
 }
 
 func (c *Client) NewPlayback(cb interface{}, opts ...PlaybackOption) (*PlaybackStream, error) {
 	p := &PlaybackStream{
-		c:         c,
-		sinkIndex: proto.Undefined,
-		cmap:      proto.ChannelMap{proto.ChannelMono},
-		rate:      44100,
-		bufSize:   proto.Undefined,
+		c: c,
+		createRequest: proto.CreatePlaybackStream{
+			SinkIndex:             proto.Undefined,
+			ChannelMap:            proto.ChannelMap{proto.ChannelMono},
+			SampleSpec:            proto.SampleSpec{Channels: 1, Rate: 44100},
+			BufferMaxLength:       proto.Undefined,
+			Corked:                true,
+			BufferTargetLength:    proto.Undefined,
+			BufferPrebufferLength: proto.Undefined,
+			BufferMinimumRequest:  proto.Undefined,
+		},
 	}
 	for _, opt := range opts {
 		opt(p)
 	}
 
-	var format byte
 	switch cb := cb.(type) {
 	case func([]byte):
-		p.format = 0
 		p.cb8 = cb
-		format = proto.FormatUint8
+		p.createRequest.Format = proto.FormatUint8
 	case func([]int16):
-		p.format = 1
 		p.cb16 = cb
-		format = formatI16
+		p.createRequest.Format = formatI16
 	case func([]int32):
-		p.format = 2
 		p.cb32 = cb
-		format = formatI32
+		p.createRequest.Format = formatI32
 	case func([]float32):
-		p.format = 3
 		p.cbf = cb
-		format = formatF32
+		p.createRequest.Format = formatF32
 	default:
 		panic("pulse: invalid callback type")
 	}
 
-	cvol := make(proto.ChannelVolumes, len(p.cmap))
+	cvol := make(proto.ChannelVolumes, len(p.createRequest.ChannelMap))
 	for i := range cvol {
 		cvol[i] = 0x100
 	}
+	p.createRequest.ChannelVolumes = cvol
 
-	var reply proto.CreatePlaybackStreamReply
-	err := c.c.Request(&proto.CreatePlaybackStream{
-		SampleSpec:            proto.SampleSpec{Format: format, Channels: byte(len(p.cmap)), Rate: p.rate},
-		ChannelMap:            p.cmap,
-		SinkIndex:             p.sinkIndex,
-		BufferMaxLength:       proto.Undefined,
-		Corked:                true,
-		BufferTargetLength:    p.bufSize,
-		BufferPrebufferLength: proto.Undefined,
-		BufferMinimumRequest:  proto.Undefined,
-		ChannelVolumes:        cvol,
-	}, &reply)
+	err := c.c.Request(&p.createRequest, &p.createReply)
 	if err != nil {
 		return nil, err
 	}
-	p.index = reply.StreamIndex
-	p.bufSize = reply.BufferTargetLength
 	c.mu.Lock()
 	c.playback[p.index] = p
 	c.mu.Unlock()
@@ -87,14 +73,14 @@ func (p *PlaybackStream) buffer(n int) []byte {
 	if n > len(p.buf) {
 		p.buf = make([]byte, n)
 	}
-	switch p.format {
-	case 0:
+	switch {
+	case p.cb8 != nil:
 		p.cb8(p.buf[:n])
-	case 1:
+	case p.cb16 != nil:
 		p.cb16(int16Slice(p.buf[:n]))
-	case 2:
+	case p.cb32 != nil:
 		p.cb32(int32Slice(p.buf[:n]))
-	case 3:
+	case p.cbf != nil:
 		p.cbf(float32Slice(p.buf[:n]))
 	}
 	return p.buf[:n]
@@ -104,7 +90,7 @@ func (p *PlaybackStream) Start() {
 	p.c.c.Request(&proto.FlushPlaybackStream{StreamIndex: p.index}, nil)
 	p.c.c.Request(&proto.CorkPlaybackStream{StreamIndex: p.index, Corked: false}, nil)
 	p.running = true
-	p.c.c.Send(p.index, p.buffer(int(p.bufSize)))
+	p.c.c.Send(p.index, p.buffer(int(p.createReply.BufferTargetLength)))
 }
 
 func (p *PlaybackStream) Stop() {
@@ -122,36 +108,38 @@ func (p *PlaybackStream) Running() bool {
 }
 
 func (p *PlaybackStream) SampleRate() int {
-	return int(p.rate)
+	return int(p.createReply.Rate)
 }
 
 func (p *PlaybackStream) Channels() int {
-	return len(p.cmap)
+	return int(p.createReply.Channels)
 }
 
 func (p *PlaybackStream) BufferSize() int {
-	s := int(p.bufSize) / len(p.cmap)
-	switch p.format {
-	case 1:
+	s := int(p.createReply.BufferTargetLength) / int(p.createReply.Channels)
+	switch {
+	case p.cb16 != nil:
 		s /= 2
-	case 2, 3:
+	case p.cb8 == nil:
 		s /= 4
 	}
 	return s
 }
 
 func (p *PlaybackStream) BufferSizeBytes() int {
-	return int(p.bufSize)
+	return int(p.createReply.BufferTargetLength)
 }
 
 type PlaybackOption func(*PlaybackStream)
 
 var PlaybackMono PlaybackOption = func(p *PlaybackStream) {
-	p.cmap = proto.ChannelMap{proto.ChannelMono}
+	p.createRequest.ChannelMap = proto.ChannelMap{proto.ChannelMono}
+	p.createRequest.Channels = 1
 }
 
 var PlaybackStereo PlaybackOption = func(p *PlaybackStream) {
-	p.cmap = proto.ChannelMap{proto.ChannelLeft, proto.ChannelRight}
+	p.createRequest.ChannelMap = proto.ChannelMap{proto.ChannelLeft, proto.ChannelRight}
+	p.createRequest.Channels = 2
 }
 
 func PlaybackChannels(m proto.ChannelMap) PlaybackOption {
@@ -159,24 +147,25 @@ func PlaybackChannels(m proto.ChannelMap) PlaybackOption {
 		panic("pulse: invalid channel map")
 	}
 	return func(p *PlaybackStream) {
-		p.cmap = m
+		p.createRequest.ChannelMap = m
+		p.createRequest.Channels = byte(len(m))
 	}
 }
 
 func PlaybackSampleRate(rate int) PlaybackOption {
 	return func(p *PlaybackStream) {
-		p.rate = uint32(rate)
+		p.createRequest.Rate = uint32(rate)
 	}
 }
 
 func PlaybackBufferSize(bytes int) PlaybackOption {
 	return func(p *PlaybackStream) {
-		p.bufSize = uint32(bytes)
+		p.createRequest.BufferTargetLength = uint32(bytes)
 	}
 }
 
 func PlaybackSinkIndex(index uint32) PlaybackOption {
 	return func(p *PlaybackStream) {
-		p.sinkIndex = index
+		p.createRequest.SinkIndex = index
 	}
 }

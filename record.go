@@ -12,69 +12,53 @@ type RecordStream struct {
 	cb32 func([]int32)
 	cbf  func([]float32)
 
-	sourceIndex   uint32
-	cmap          proto.ChannelMap
-	rate          uint32
-	format        byte
-	fragSize      uint32
-	adjustLatency bool
+	createRequest proto.CreateRecordStream
+	createReply   proto.CreateRecordStreamReply
 }
 
 func (c *Client) NewRecord(cb interface{}, opts ...RecordOption) (*RecordStream, error) {
 	r := &RecordStream{
-		c:           c,
-		sourceIndex: proto.Undefined,
-		cmap:        proto.ChannelMap{proto.ChannelMono},
-		rate:        44100,
-		fragSize:    proto.Undefined,
+		c: c,
+		createRequest: proto.CreateRecordStream{
+			SourceIndex:        proto.Undefined,
+			ChannelMap:         proto.ChannelMap{proto.ChannelMono},
+			SampleSpec:         proto.SampleSpec{Channels: 1, Rate: 44100},
+			BufferMaxLength:    proto.Undefined,
+			Corked:             true,
+			BufferFragSize:     proto.Undefined,
+			DirectOnInputIndex: proto.Undefined,
+		},
 	}
 	for _, opt := range opts {
 		opt(r)
 	}
 
-	var format byte
 	switch cb := cb.(type) {
 	case func([]byte):
-		r.format = 0
 		r.cb8 = cb
-		format = proto.FormatUint8
+		r.createRequest.Format = proto.FormatUint8
 	case func([]int16):
-		r.format = 1
 		r.cb16 = cb
-		format = formatI16
+		r.createRequest.Format = formatI16
 	case func([]int32):
-		r.format = 2
 		r.cb32 = cb
-		format = formatI32
+		r.createRequest.Format = formatI32
 	case func([]float32):
-		r.format = 3
 		r.cbf = cb
-		format = formatF32
+		r.createRequest.Format = formatF32
 	default:
 		panic("pulse: invalid callback type")
 	}
 
-	cvol := make(proto.ChannelVolumes, len(r.cmap))
+	cvol := make(proto.ChannelVolumes, len(r.createRequest.ChannelMap))
 	for i := range cvol {
 		cvol[i] = 0x100
 	}
 
-	var reply proto.CreateRecordStreamReply
-	err := c.c.Request(&proto.CreateRecordStream{
-		SampleSpec:         proto.SampleSpec{Format: format, Channels: byte(len(r.cmap)), Rate: r.rate},
-		ChannelMap:         r.cmap,
-		SourceIndex:        r.sourceIndex,
-		BufferMaxLength:    proto.Undefined,
-		Corked:             true,
-		BufferFragSize:     r.fragSize,
-		ChannelVolumes:     cvol,
-		DirectOnInputIndex: proto.Undefined,
-		AdjustLatency:      r.adjustLatency,
-	}, &reply)
+	err := c.c.Request(&r.createRequest, &r.createReply)
 	if err != nil {
 		return nil, err
 	}
-	r.index = reply.StreamIndex
 	c.mu.Lock()
 	c.record[r.index] = r
 	c.mu.Unlock()
@@ -82,14 +66,14 @@ func (c *Client) NewRecord(cb interface{}, opts ...RecordOption) (*RecordStream,
 }
 
 func (r *RecordStream) write(buf []byte) {
-	switch r.format {
-	case 0:
+	switch {
+	case r.cb8 != nil:
 		r.cb8(buf)
-	case 1:
+	case r.cb16 != nil:
 		r.cb16(int16Slice(buf))
-	case 2:
+	case r.cb32 != nil:
 		r.cb32(int32Slice(buf))
-	case 3:
+	case r.cbf != nil:
 		r.cbf(float32Slice(buf))
 	}
 }
@@ -115,21 +99,23 @@ func (r *RecordStream) Running() bool {
 }
 
 func (r *RecordStream) SampleRate() int {
-	return int(r.rate)
+	return int(r.createReply.Rate)
 }
 
 func (r *RecordStream) Channels() int {
-	return len(r.cmap)
+	return int(r.createReply.Channels)
 }
 
 type RecordOption func(*RecordStream)
 
 var RecordMono RecordOption = func(r *RecordStream) {
-	r.cmap = proto.ChannelMap{proto.ChannelMono}
+	r.createRequest.ChannelMap = proto.ChannelMap{proto.ChannelMono}
+	r.createRequest.Channels = 1
 }
 
 var RecordStereo RecordOption = func(r *RecordStream) {
-	r.cmap = proto.ChannelMap{proto.ChannelLeft, proto.ChannelRight}
+	r.createRequest.ChannelMap = proto.ChannelMap{proto.ChannelLeft, proto.ChannelRight}
+	r.createRequest.Channels = 2
 }
 
 func RecordChannels(m proto.ChannelMap) RecordOption {
@@ -137,30 +123,31 @@ func RecordChannels(m proto.ChannelMap) RecordOption {
 		panic("pulse: invalid channel map")
 	}
 	return func(r *RecordStream) {
-		r.cmap = m
+		r.createRequest.ChannelMap = m
+		r.createRequest.Channels = byte(len(m))
 	}
 }
 
 func RecordSampleRate(rate int) RecordOption {
 	return func(r *RecordStream) {
-		r.rate = uint32(rate)
+		r.createRequest.Rate = uint32(rate)
 	}
 }
 
 func RecordBufferFragmentSize(size uint32) RecordOption {
 	return func(r *RecordStream) {
-		r.fragSize = size
+		r.createRequest.BufferFragSize = size
 	}
 }
 
 func RecordAdjustLatency(adjust bool) RecordOption {
 	return func(r *RecordStream) {
-		r.adjustLatency = adjust
+		r.createRequest.AdjustLatency = adjust
 	}
 }
 
 func RecordSourceIndex(index uint32) RecordOption {
 	return func(p *RecordStream) {
-		p.sourceIndex = index
+		p.createRequest.SourceIndex = index
 	}
 }
