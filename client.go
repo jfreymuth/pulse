@@ -12,6 +12,7 @@ import (
 	"github.com/jfreymuth/pulse/proto"
 )
 
+// The Client is the connection to the pulseaudio server. An application typically only uses a single client.
 type Client struct {
 	conn net.Conn
 	c    proto.Client
@@ -25,6 +26,7 @@ type Client struct {
 	mediaName string
 }
 
+// NewClient connects to the server.
 func NewClient(opts ...ClientOption) (*Client, error) {
 	servers := []serverString{
 		{
@@ -139,21 +141,27 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 	return nil, fmt.Errorf("connections failed: %v", lastErr)
 }
 
+// Close closes the client. Calling methods on a closed client may panic.
 func (c *Client) Close() {
 	c.conn.Close()
 }
 
+// A ClientOption supplies configuration when creating the client.
 type ClientOption func(*Client)
 
+// ClientApplicationName sets the application name. This will e.g. be displayed by an audio mixer to identity the application.
 func ClientApplicationName(name string) ClientOption {
 	return func(c *Client) { c.appName = name }
 }
 
+// ClientMediaName sets the media name. This will e.g. be displayed by an audio mixer to identity the application.
 func ClientMediaName(name string) ClientOption {
 	return func(c *Client) { c.mediaName = name }
 }
 
-// see https://www.freedesktop.org/wiki/Software/PulseAudio/Documentation/User/ServerStrings/
+// ClientServerString will override the default server strings.
+// Server strings are used to connect to the server. For the server string format see
+// https://www.freedesktop.org/wiki/Software/PulseAudio/Documentation/User/ServerStrings/
 func ClientServerString(s string) ClientOption {
 	return func(c *Client) { c.server = s }
 }
