@@ -109,6 +109,20 @@ func (p *PlaybackStream) Resume() {
 	p.running = true
 }
 
+// Close closes the stream.
+// Calling methods on a closed stream may panic.
+func (p *PlaybackStream) Close() {
+	p.c.c.Request(&proto.DeletePlaybackStream{StreamIndex: p.index}, nil)
+	p.running = false
+	p.c = nil
+}
+
+// Closed returns wether the stream was closed.
+// Calling other methods on a closed stream may panic.
+func (p *PlaybackStream) Closed() bool {
+	return p.c == nil
+}
+
 func (p *PlaybackStream) Running() bool {
 	return p.running
 }

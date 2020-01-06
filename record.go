@@ -94,6 +94,20 @@ func (r *RecordStream) Resume() {
 	r.running = true
 }
 
+// Close closes the stream.
+// Calling methods on a closed stream may panic.
+func (r *RecordStream) Close() {
+	r.c.c.Request(&proto.DeleteRecordStream{StreamIndex: r.index}, nil)
+	r.running = false
+	r.c = nil
+}
+
+// Closed returns wether the stream was closed.
+// Calling other methods on a closed stream may panic.
+func (r *RecordStream) Closed() bool {
+	return r.c == nil
+}
+
 func (r *RecordStream) Running() bool {
 	return r.running
 }
@@ -147,13 +161,13 @@ func RecordAdjustLatency(adjust bool) RecordOption {
 }
 
 func RecordSource(source *Source) RecordOption {
-	return func(p *RecordStream) {
-		p.createRequest.SourceIndex = source.info.SourceIndex
+	return func(r *RecordStream) {
+		r.createRequest.SourceIndex = source.info.SourceIndex
 	}
 }
 
 func RecordMonitor(sink *Sink) RecordOption {
-	return func(p *RecordStream) {
-		p.createRequest.SourceIndex = sink.info.MonitorSourceIndex
+	return func(r *RecordStream) {
+		r.createRequest.SourceIndex = sink.info.MonitorSourceIndex
 	}
 }
