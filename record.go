@@ -146,8 +146,14 @@ func RecordAdjustLatency(adjust bool) RecordOption {
 	}
 }
 
-func RecordSourceIndex(index uint32) RecordOption {
+func RecordSource(source *Source) RecordOption {
 	return func(p *RecordStream) {
-		p.createRequest.SourceIndex = index
+		p.createRequest.SourceIndex = source.info.SourceIndex
+	}
+}
+
+func RecordMonitor(sink *Sink) RecordOption {
+	return func(p *RecordStream) {
+		p.createRequest.SourceIndex = sink.info.MonitorSourceIndex
 	}
 }

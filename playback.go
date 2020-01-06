@@ -164,8 +164,8 @@ func PlaybackBufferSize(bytes int) PlaybackOption {
 	}
 }
 
-func PlaybackSinkIndex(index uint32) PlaybackOption {
+func PlaybackSink(sink *Sink) PlaybackOption {
 	return func(p *PlaybackStream) {
-		p.createRequest.SinkIndex = index
+		p.createRequest.SinkIndex = sink.info.SinkIndex
 	}
 }
