@@ -19,6 +19,15 @@ func (c *Client) ListSinks() ([]*Sink, error) {
 	return sinks, nil
 }
 
+func (c *Client) DefaultSink() (*Sink, error) {
+	var sink Sink
+	err := c.c.Request(&proto.GetSinkInfo{SinkIndex: proto.Undefined}, &sink.info)
+	if err != nil {
+		return nil, err
+	}
+	return &sink, nil
+}
+
 func (s *Sink) Name() string {
 	return s.info.SinkName
 }

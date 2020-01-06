@@ -19,6 +19,15 @@ func (c *Client) ListSources() ([]*Source, error) {
 	return sinks, nil
 }
 
+func (c *Client) DefaultSource() (*Source, error) {
+	var source Source
+	err := c.c.Request(&proto.GetSourceInfo{SourceIndex: proto.Undefined}, &source.info)
+	if err != nil {
+		return nil, err
+	}
+	return &source, nil
+}
+
 func (s *Source) Name() string {
 	return s.info.SourceName
 }
