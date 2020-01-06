@@ -2,6 +2,8 @@ package pulse
 
 import "github.com/jfreymuth/pulse/proto"
 
+// A PlaybackStream is used for playing audio.
+// When creating a stream, the user must provide a callback that will be used to buffer audio data.
 type PlaybackStream struct {
 	c       *Client
 	index   uint32
@@ -19,6 +21,10 @@ type PlaybackStream struct {
 	createReply   proto.CreatePlaybackStreamReply
 }
 
+// NewPlayback creates a playback stream.
+// The type of cb must be func([]byte), func([]int16), func([]int32), or func([]float32).
+// The created stream wil not be running, it must be started with Start().
+// The order of options is important in some cases, see the documentation of the individual PlaybackOptions.
 func (c *Client) NewPlayback(cb interface{}, opts ...PlaybackOption) (*PlaybackStream, error) {
 	p := &PlaybackStream{
 		c: c,
@@ -92,6 +98,7 @@ func (p *PlaybackStream) buffer(n int) []byte {
 	return p.buf[:n]
 }
 
+// Start starts playing audio.
 func (p *PlaybackStream) Start() {
 	p.c.c.Request(&proto.FlushPlaybackStream{StreamIndex: p.index}, nil)
 	p.c.c.Send(p.index, p.buffer(int(p.createReply.BufferTargetLength)))
@@ -99,11 +106,13 @@ func (p *PlaybackStream) Start() {
 	p.running = true
 }
 
+// Stop stops playing audio; the callback will no longer be called.
 func (p *PlaybackStream) Stop() {
 	p.c.c.Request(&proto.CorkPlaybackStream{StreamIndex: p.index, Corked: true}, nil)
 	p.running = false
 }
 
+// Resume resumes a stopped stream.
 func (p *PlaybackStream) Resume() {
 	p.c.c.Request(&proto.CorkPlaybackStream{StreamIndex: p.index, Corked: false}, nil)
 	p.running = true
@@ -123,39 +132,48 @@ func (p *PlaybackStream) Closed() bool {
 	return p.c == nil
 }
 
+// Running returns wether the stream is currently playing.
 func (p *PlaybackStream) Running() bool {
 	return p.running
 }
 
+// SampleRate returns the stream's sample rate (samples per second).
 func (p *PlaybackStream) SampleRate() int {
 	return int(p.createReply.Rate)
 }
 
+// Channels returns the number of channels.
 func (p *PlaybackStream) Channels() int {
 	return int(p.createReply.Channels)
 }
 
+// BufferSize returns the size of the server-side buffer in samples.
 func (p *PlaybackStream) BufferSize() int {
 	s := int(p.createReply.BufferTargetLength) / int(p.createReply.Channels)
 	return s / p.bytesPerSample
 }
 
+// BufferSizeBytes returns the size of the server-side buffer in bytes.
 func (p *PlaybackStream) BufferSizeBytes() int {
 	return int(p.createReply.BufferTargetLength)
 }
 
+// A PlaybackOption supplies configuration when creating streams.
 type PlaybackOption func(*PlaybackStream)
 
+// PlaybackMono sets a stream to a single channel.
 var PlaybackMono PlaybackOption = func(p *PlaybackStream) {
 	p.createRequest.ChannelMap = proto.ChannelMap{proto.ChannelMono}
 	p.createRequest.Channels = 1
 }
 
+// PlaybackStereo sets a stream to two channels.
 var PlaybackStereo PlaybackOption = func(p *PlaybackStream) {
 	p.createRequest.ChannelMap = proto.ChannelMap{proto.ChannelLeft, proto.ChannelRight}
 	p.createRequest.Channels = 2
 }
 
+// PlaybackChannels sets a stream to use a custom channel map.
 func PlaybackChannels(m proto.ChannelMap) PlaybackOption {
 	if len(m) == 0 {
 		panic("pulse: invalid channel map")
@@ -166,36 +184,45 @@ func PlaybackChannels(m proto.ChannelMap) PlaybackOption {
 	}
 }
 
+// PlaybackSampleRate sets the stream's sample rate.
 func PlaybackSampleRate(rate int) PlaybackOption {
 	return func(p *PlaybackStream) {
 		p.createRequest.Rate = uint32(rate)
 	}
 }
 
-func PlaybackBufferSize(bytes int) PlaybackOption {
+// PlaybackBufferSize sets the size of the server-side buffer.
+// Buffer size and latency should not be set at the same time.
+func PlaybackBufferSize(samples int) PlaybackOption {
 	return func(p *PlaybackStream) {
-		p.createRequest.BufferTargetLength = uint32(bytes)
+		p.createRequest.BufferTargetLength = uint32(samples * p.bytesPerSample)
+		p.createRequest.AdjustLatency = false
 	}
 }
 
+// PlaybackLatency sets the stream's latency in seconds.
+// This sould be set after sample rate and channel options.
 func PlaybackLatency(seconds float64) PlaybackOption {
 	return func(p *PlaybackStream) {
-		p.createRequest.BufferTargetLength = uint32(seconds*float64(p.createRequest.Rate)) * uint32(p.bytesPerSample)
+		p.createRequest.BufferTargetLength = uint32(seconds*float64(p.createRequest.Rate)) * uint32(p.createRequest.Channels) * uint32(p.bytesPerSample)
 		p.createRequest.BufferMaxLength = 2 * p.createRequest.BufferTargetLength
 		p.createRequest.AdjustLatency = true
 	}
 }
 
+// PlaybackSink sets the sink the stream should send audio to.
 func PlaybackSink(sink *Sink) PlaybackOption {
 	return func(p *PlaybackStream) {
 		p.createRequest.SinkIndex = sink.info.SinkIndex
 	}
 }
 
+// PlaybackLowLatency sets the latency to the lowest safe value, as recommended by the pulseaudio server.
+// This sould be set after sample rate and channel options.
 func PlaybackLowLatency(sink *Sink) PlaybackOption {
 	return func(p *PlaybackStream) {
 		p.createRequest.SinkIndex = sink.info.SinkIndex
-		p.createRequest.BufferTargetLength = uint32(uint64(sink.info.RequestedLatency)*uint64(p.createRequest.Rate)/1000000) * uint32(p.bytesPerSample)
+		p.createRequest.BufferTargetLength = uint32(uint64(sink.info.RequestedLatency)*uint64(p.createRequest.Rate)/1000000) * uint32(p.createRequest.Channels) * uint32(p.bytesPerSample)
 		p.createRequest.BufferMaxLength = 2 * p.createRequest.BufferTargetLength
 		p.createRequest.AdjustLatency = true
 	}
