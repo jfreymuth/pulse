@@ -29,7 +29,7 @@ func (c *Client) NewPlayback(cb interface{}, opts ...PlaybackOption) (*PlaybackS
 			BufferMaxLength:       proto.Undefined,
 			Corked:                true,
 			BufferTargetLength:    proto.Undefined,
-			BufferPrebufferLength: proto.Undefined,
+			BufferPrebufferLength: 0,
 			BufferMinimumRequest:  proto.Undefined,
 		},
 	}
@@ -94,9 +94,9 @@ func (p *PlaybackStream) buffer(n int) []byte {
 
 func (p *PlaybackStream) Start() {
 	p.c.c.Request(&proto.FlushPlaybackStream{StreamIndex: p.index}, nil)
+	p.c.c.Send(p.index, p.buffer(int(p.createReply.BufferTargetLength)))
 	p.c.c.Request(&proto.CorkPlaybackStream{StreamIndex: p.index, Corked: false}, nil)
 	p.running = true
-	p.c.c.Send(p.index, p.buffer(int(p.createReply.BufferTargetLength)))
 }
 
 func (p *PlaybackStream) Stop() {
@@ -161,6 +161,14 @@ func PlaybackSampleRate(rate int) PlaybackOption {
 func PlaybackBufferSize(bytes int) PlaybackOption {
 	return func(p *PlaybackStream) {
 		p.createRequest.BufferTargetLength = uint32(bytes)
+	}
+}
+
+func PlaybackLatency(seconds float64) PlaybackOption {
+	return func(p *PlaybackStream) {
+		p.createRequest.BufferTargetLength = uint32(seconds*float64(p.createRequest.Rate)) * uint32(p.bytesPerSample)
+		p.createRequest.BufferMaxLength = 2 * p.createRequest.BufferTargetLength
+		p.createRequest.AdjustLatency = true
 	}
 }
 
