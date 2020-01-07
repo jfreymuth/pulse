@@ -25,7 +25,6 @@ func TestIntegration(t *testing.T) {
 			func(in []int16) {
 				buf = append(buf, in...)
 			},
-			pulse.RecordAdjustLatency(true),
 			pulse.RecordBufferFragmentSize(256),
 		)
 		if err != nil {
