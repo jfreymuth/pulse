@@ -1,7 +1,6 @@
 package proto
 
 import (
-	"errors"
 	"io"
 	"reflect"
 	"strconv"
@@ -112,7 +111,7 @@ func (p *ProtocolReader) string() string {
 			return s
 		}
 	}
-	p.setErr(errors.New("string too long"))
+	p.setErr(ErrProtocolError)
 	return ""
 }
 
@@ -152,24 +151,24 @@ func (p *ProtocolReader) propList(out map[string]string) {
 			break
 		}
 		if keyType != 't' {
-			p.setErr(errors.New("pulse: protocol error"))
+			p.setErr(ErrProtocolError)
 			return
 		}
 		key := p.string()
 		lenType := p.byte()
 		if lenType != 'L' {
-			p.setErr(errors.New("pulse: protocol error"))
+			p.setErr(ErrProtocolError)
 			return
 		}
 		l := p.uint32()
 		valueType := p.byte()
 		if valueType != 'x' {
-			p.setErr(errors.New("pulse: protocol error"))
+			p.setErr(ErrProtocolError)
 			return
 		}
 		value := p.x()
 		if len(value) != int(l) {
-			p.setErr(errors.New("pulse: protocol error"))
+			p.setErr(ErrProtocolError)
 			return
 		}
 		out[key] = string(value[:len(value)-1])

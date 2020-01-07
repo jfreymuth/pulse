@@ -110,7 +110,7 @@ func (c *Client) readLoop() {
 			switch op {
 			case OpError:
 				c.r.byte()
-				err := fmt.Errorf("pulse: %s", errorStrings[c.r.uint32()])
+				err := Error(c.r.uint32())
 				for {
 					c.err <- err
 				}
@@ -224,34 +224,4 @@ func (c *Client) parseInfoList(value interface{}, length int) {
 type DataPacket struct {
 	StreamIndex uint32
 	Data        []byte
-}
-
-var errorStrings = []string{
-	"ok",
-	"access denied",
-	"unknown command",
-	"invalid argument",
-	"entity exists",
-	"no such entity",
-	"connection refused",
-	"protocol error",
-	"timeout",
-	"no authentication key",
-	"internal error",
-	"connection terminated",
-	"entity killed",
-	"invalid server",
-	"module initialization failed",
-	"bad state",
-	"no data",
-	"incompatible protocol version",
-	"too large",
-	"not supported",
-	"unknown error code",
-	"no such extension",
-	"obsolete functionality",
-	"missing implementation",
-	"client forked",
-	"input/output error",
-	"device or resource busy",
 }
