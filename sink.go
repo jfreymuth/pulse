@@ -31,13 +31,23 @@ func (c *Client) DefaultSink() (*Sink, error) {
 	return &sink, nil
 }
 
-// Name returns the sink name. Sink names are always unique, but not necessarily human-readable.
-func (s *Sink) Name() string {
+// SinkByID looks up a sink id.
+func (c *Client) SinkByID(name string) (*Sink, error) {
+	var sink Sink
+	err := c.c.Request(&proto.GetSinkInfo{SinkName: name}, &sink.info)
+	if err != nil {
+		return nil, err
+	}
+	return &sink, nil
+}
+
+// ID returns the sink name. Sink names are unique identifiers, but not necessarily human-readable.
+func (s *Sink) ID() string {
 	return s.info.SinkName
 }
 
-// DeviceName is a human-readable name describing the sink.
-func (s *Sink) DeviceName() string {
+// Name is a human-readable name describing the sink.
+func (s *Sink) Name() string {
 	return s.info.Device
 }
 

@@ -31,12 +31,32 @@ func (c *Client) DefaultSource() (*Source, error) {
 	return &source, nil
 }
 
-// Name returns the source name. Source names are always unique, but not necessarily human-readable.
-func (s *Source) Name() string {
+// SourceByID looks up a source id.
+func (c *Client) SourceByID(name string) (*Source, error) {
+	var source Source
+	err := c.c.Request(&proto.GetSourceInfo{SourceName: name}, &source.info)
+	if err != nil {
+		return nil, err
+	}
+	return &source, nil
+}
+
+// ID returns the source name. Source names are unique identifiers, but not necessarily human-readable.
+func (s *Source) ID() string {
 	return s.info.SourceName
 }
 
-// DeviceName is a human-readable name describing the source.
-func (s *Source) DeviceName() string {
+// Name is a human-readable name describing the source.
+func (s *Source) Name() string {
 	return s.info.Device
+}
+
+// Channels returns the default channel map.
+func (s *Source) Channels() proto.ChannelMap {
+	return s.info.ChannelMap
+}
+
+// SampleRate returns the default sample rate.
+func (s *Source) SampleRate() int {
+	return int(s.info.Rate)
 }
