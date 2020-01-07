@@ -16,7 +16,13 @@ func main() {
 	}
 	defer c.Close()
 
-	stream, err := c.NewPlayback(synth)
+	s, err := c.DefaultSink()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	stream, err := c.NewPlayback(synth, pulse.PlaybackLowLatency(s))
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -26,6 +32,8 @@ func main() {
 
 	fmt.Print("Press enter to stop...")
 	os.Stdin.Read([]byte{0})
+
+	stream.Close()
 }
 
 var t, phase float32
