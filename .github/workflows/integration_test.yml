@@ -1,0 +1,17 @@
+name: integration test
+on:
+  pull_request:
+    branches: master
+  push:
+    branches: master
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+      - name: integration test
+        run: |
+          docker build -t pulse-test -f .github/integration-test/Dockerfile .
+          docker run pulse-test go test -tags integration -v ./... ./.github/integration-test
