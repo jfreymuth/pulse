@@ -54,6 +54,7 @@ func (c *Client) NewRecord(cb interface{}, opts ...RecordOption) (*RecordStream,
 	for i := range cvol {
 		cvol[i] = 0x100
 	}
+	r.createRequest.ChannelVolumes = cvol
 
 	err := c.c.Request(&r.createRequest, &r.createReply)
 	if err != nil {
