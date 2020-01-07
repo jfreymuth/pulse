@@ -192,6 +192,8 @@ func PlaybackSampleRate(rate int) PlaybackOption {
 }
 
 // PlaybackBufferSize sets the size of the server-side buffer.
+// Setting the buffer size too small causes underflows, resulting in audible artifacts.
+//
 // Buffer size and latency should not be set at the same time.
 func PlaybackBufferSize(samples int) PlaybackOption {
 	return func(p *PlaybackStream) {
@@ -201,7 +203,12 @@ func PlaybackBufferSize(samples int) PlaybackOption {
 }
 
 // PlaybackLatency sets the stream's latency in seconds.
+// Setting the latency too low causes underflows, resulting in audible artifacts.
+// Applications should generally use the highest acceptable latency.
+//
 // This sould be set after sample rate and channel options.
+//
+// Buffer size and latency should not be set at the same time.
 func PlaybackLatency(seconds float64) PlaybackOption {
 	return func(p *PlaybackStream) {
 		p.createRequest.BufferTargetLength = uint32(seconds*float64(p.createRequest.Rate)) * uint32(p.createRequest.Channels) * uint32(p.bytesPerSample)
@@ -218,7 +225,10 @@ func PlaybackSink(sink *Sink) PlaybackOption {
 }
 
 // PlaybackLowLatency sets the latency to the lowest safe value, as recommended by the pulseaudio server.
+//
 // This sould be set after sample rate and channel options.
+//
+// Buffer size and latency should not be set at the same time.
 func PlaybackLowLatency(sink *Sink) PlaybackOption {
 	return func(p *PlaybackStream) {
 		p.createRequest.SinkIndex = sink.info.SinkIndex
