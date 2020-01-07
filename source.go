@@ -34,7 +34,7 @@ func (c *Client) DefaultSource() (*Source, error) {
 // SourceByID looks up a source id.
 func (c *Client) SourceByID(name string) (*Source, error) {
 	var source Source
-	err := c.c.Request(&proto.GetSourceInfo{SourceName: name}, &source.info)
+	err := c.c.Request(&proto.GetSourceInfo{SourceIndex: proto.Undefined, SourceName: name}, &source.info)
 	if err != nil {
 		return nil, err
 	}

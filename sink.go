@@ -34,7 +34,7 @@ func (c *Client) DefaultSink() (*Sink, error) {
 // SinkByID looks up a sink id.
 func (c *Client) SinkByID(name string) (*Sink, error) {
 	var sink Sink
-	err := c.c.Request(&proto.GetSinkInfo{SinkName: name}, &sink.info)
+	err := c.c.Request(&proto.GetSinkInfo{SinkIndex: proto.Undefined, SinkName: name}, &sink.info)
 	if err != nil {
 		return nil, err
 	}
