@@ -35,6 +35,7 @@ func (c *Client) NewRecord(cb interface{}, opts ...RecordOption) (*RecordStream,
 			Corked:             true,
 			BufferFragSize:     proto.Undefined,
 			DirectOnInputIndex: proto.Undefined,
+			Properties:         map[string]string{},
 		},
 	}
 
@@ -208,5 +209,21 @@ func RecordSource(source *Source) RecordOption {
 func RecordMonitor(sink *Sink) RecordOption {
 	return func(r *RecordStream) {
 		r.createRequest.SourceIndex = sink.info.MonitorSourceIndex
+	}
+}
+
+// RecordMediaName sets the streams media name.
+// This will e.g. be displayed by a volume control application to identity the stream.
+func RecordMediaName(name string) RecordOption {
+	return func(r *RecordStream) {
+		r.createRequest.Properties["media.name"] = name
+	}
+}
+
+// RecordMediaIconName sets the streams media icon using an xdg icon name.
+// This will e.g. be displayed by a volume control application to identity the stream.
+func RecordMediaIconName(name string) RecordOption {
+	return func(r *RecordStream) {
+		r.createRequest.Properties["media.icon_name"] = name
 	}
 }

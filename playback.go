@@ -37,6 +37,7 @@ func (c *Client) NewPlayback(cb interface{}, opts ...PlaybackOption) (*PlaybackS
 			BufferTargetLength:    proto.Undefined,
 			BufferPrebufferLength: 0,
 			BufferMinimumRequest:  proto.Undefined,
+			Properties:            map[string]string{},
 		},
 	}
 
@@ -235,5 +236,21 @@ func PlaybackLowLatency(sink *Sink) PlaybackOption {
 		p.createRequest.BufferTargetLength = uint32(uint64(sink.info.RequestedLatency)*uint64(p.createRequest.Rate)/1000000) * uint32(p.createRequest.Channels) * uint32(p.bytesPerSample)
 		p.createRequest.BufferMaxLength = 2 * p.createRequest.BufferTargetLength
 		p.createRequest.AdjustLatency = true
+	}
+}
+
+// PlaybackMediaName sets the streams media name.
+// This will e.g. be displayed by a volume control application to identity the stream.
+func PlaybackMediaName(name string) PlaybackOption {
+	return func(p *PlaybackStream) {
+		p.createRequest.Properties["media.name"] = name
+	}
+}
+
+// PlaybackMediaIconName sets the streams media icon using an xdg icon name.
+// This will e.g. be displayed by a volume control application to identity the stream.
+func PlaybackMediaIconName(name string) PlaybackOption {
+	return func(p *PlaybackStream) {
+		p.createRequest.Properties["media.icon_name"] = name
 	}
 }

@@ -21,9 +21,8 @@ type Client struct {
 	playback map[uint32]*PlaybackStream
 	record   map[uint32]*RecordStream
 
-	server    string
-	appName   string
-	mediaName string
+	server string
+	props  map[string]string
 }
 
 // NewClient connects to the server.
@@ -36,8 +35,14 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 	}
 
 	c := &Client{
-		appName:   path.Base(os.Args[0]),
-		mediaName: "go audio",
+		props: map[string]string{
+			"media.name":                 "go audio",
+			"application.name":           path.Base(os.Args[0]),
+			"application.icon_name":      "audio-x-generic",
+			"application.process.id":     fmt.Sprintf("%d", os.Getpid()),
+			"application.process.binary": os.Args[0],
+			"window.x11.display":         os.Getenv("DISPLAY"),
+		},
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -123,13 +128,7 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 		}
 		c.c.SetVersion(authReply.Version)
 
-		err = c.c.Request(&proto.SetClientName{Props: map[string]string{
-			"media.name":                 c.mediaName,
-			"application.name":           c.appName,
-			"application.process.id":     fmt.Sprintf("%d", os.Getpid()),
-			"application.process.binary": os.Args[0],
-			"window.x11.display":         os.Getenv("DISPLAY"),
-		}}, &proto.SetClientNameReply{})
+		err = c.c.Request(&proto.SetClientName{Props: c.props}, &proto.SetClientNameReply{})
 		if err != nil {
 			c.conn.Close()
 			lastErr = err
@@ -149,14 +148,17 @@ func (c *Client) Close() {
 // A ClientOption supplies configuration when creating the client.
 type ClientOption func(*Client)
 
-// ClientApplicationName sets the application name. This will e.g. be displayed by an audio mixer to identity the application.
+// ClientApplicationName sets the application name.
+// This will e.g. be displayed by a volume control application to identity the application.
+// It should be human-readable and localized.
 func ClientApplicationName(name string) ClientOption {
-	return func(c *Client) { c.appName = name }
+	return func(c *Client) { c.props["application.name"] = name }
 }
 
-// ClientMediaName sets the media name. This will e.g. be displayed by an audio mixer to identity the application.
-func ClientMediaName(name string) ClientOption {
-	return func(c *Client) { c.mediaName = name }
+// ClientApplicationIconName sets the application icon using an xdg icon name.
+// This will e.g. be displayed by a volume control application to identity the application.
+func ClientApplicationIconName(name string) ClientOption {
+	return func(c *Client) { c.props["application.icon_name"] = name }
 }
 
 // ClientServerString will override the default server strings.
