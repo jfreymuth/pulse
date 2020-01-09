@@ -207,7 +207,7 @@ func PlaybackBufferSize(samples int) PlaybackOption {
 // Setting the latency too low causes underflows, resulting in audible artifacts.
 // Applications should generally use the highest acceptable latency.
 //
-// This sould be set after sample rate and channel options.
+// This should be set after sample rate and channel options.
 //
 // Buffer size and latency should not be set at the same time.
 func PlaybackLatency(seconds float64) PlaybackOption {
@@ -227,7 +227,7 @@ func PlaybackSink(sink *Sink) PlaybackOption {
 
 // PlaybackLowLatency sets the latency to the lowest safe value, as recommended by the pulseaudio server.
 //
-// This sould be set after sample rate and channel options.
+// This should be set after sample rate and channel options.
 //
 // Buffer size and latency should not be set at the same time.
 func PlaybackLowLatency(sink *Sink) PlaybackOption {

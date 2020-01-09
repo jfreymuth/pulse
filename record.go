@@ -187,7 +187,7 @@ func RecordBufferFragmentSize(size uint32) RecordOption {
 
 // RecordLatency sets the stream's latency in seconds.
 //
-// This sould be set after sample rate and channel options.
+// This should be set after sample rate and channel options.
 //
 // Fragment size and latency should not be set at the same time.
 func RecordLatency(seconds float64) RecordOption {
