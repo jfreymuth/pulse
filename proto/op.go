@@ -589,12 +589,14 @@ type SetSinkVolume struct {
 	SinkName       string
 	ChannelVolumes ChannelVolumes
 }
+type SetSinkVolumeReply struct{}
 
 type SetSourceVolume struct {
 	SourceIndex    uint32
 	SourceName     string
 	ChannelVolumes ChannelVolumes
 }
+type SetSourceVolumeReply struct{}
 
 type SetSinkInputVolume struct {
 	SinkInputIndex uint32
@@ -908,6 +910,8 @@ func (*SetPlaybackStreamBufferAttrReply) IsReplyTo() uint32 { return OpSetPlayba
 func (*SetRecordStreamBufferAttrReply) IsReplyTo() uint32   { return OpSetRecordStreamBufferAttr }
 func (*GetCardInfoReply) IsReplyTo() uint32                 { return OpGetCardInfo }
 func (*GetCardInfoListReply) IsReplyTo() uint32             { return OpGetCardInfoList }
+func (*SetSinkVolumeReply) IsReplyTo() uint32               { return OpSetSinkVolume }
+func (*SetSourceVolumeReply) IsReplyTo() uint32             { return OpSetSourceVolume }
 
 // SERVER -> CLIENT MESSAGES
 
