@@ -60,3 +60,9 @@ func (s *Sink) Channels() proto.ChannelMap {
 func (s *Sink) SampleRate() int {
 	return int(s.info.Rate)
 }
+
+// SinkIndex returns the source index.
+// This should only be used together with (*Cient).RawRequest.
+func (s *Sink) SinkIndex() uint32 {
+	return s.info.SinkIndex
+}

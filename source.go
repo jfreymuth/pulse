@@ -60,3 +60,9 @@ func (s *Source) Channels() proto.ChannelMap {
 func (s *Source) SampleRate() int {
 	return int(s.info.Rate)
 }
+
+// SourceIndex returns the source index.
+// This should only be used together with (*Cient).RawRequest.
+func (s *Source) SourceIndex() uint32 {
+	return s.info.SourceIndex
+}

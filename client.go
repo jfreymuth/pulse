@@ -167,3 +167,16 @@ func ClientApplicationIconName(name string) ClientOption {
 func ClientServerString(s string) ClientOption {
 	return func(c *Client) { c.server = s }
 }
+
+// RawRequest can be used to send arbitrary requests.
+//
+// req should be one of the request types defined by the proto package.
+//
+// rpl must be a pointer to the correct reply type or nil. This funcion will panic if rpl has the wrong type.
+//
+// The returned error can be compared against errors defined by the proto package to check for specific errors.
+//
+// The function will always block until the server has replied, even if rpl is nil.
+func (c *Client) RawRequest(req proto.RequestArgs, rpl proto.Reply) error {
+	return c.c.Request(req, rpl)
+}
