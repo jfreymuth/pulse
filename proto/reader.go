@@ -202,6 +202,7 @@ func (p *ProtocolReader) value(i interface{}, version Version) {
 					p.byte() // B
 					fi[i].Encoding = p.byte()
 					p.byte() // P
+					fi[i].Properties = make(map[string]string)
 					p.propList(fi[i].Properties)
 				}
 			} else {
