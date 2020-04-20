@@ -83,8 +83,11 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 				c.mu.Lock()
 				stream, ok := c.playback[msg.StreamIndex]
 				c.mu.Unlock()
-				if ok {
-					c.c.Send(msg.StreamIndex, stream.buffer(int(msg.Length)))
+				if ok && !stream.ended {
+					buf := stream.buffer(int(msg.Length))
+					if buf != nil {
+						c.c.Send(msg.StreamIndex, buf)
+					}
 				}
 			case *proto.DataPacket:
 				c.mu.Lock()
@@ -92,6 +95,16 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 				c.mu.Unlock()
 				if ok {
 					stream.write(msg.Data)
+				}
+			case *proto.Underflow:
+				c.mu.Lock()
+				stream, ok := c.playback[msg.StreamIndex]
+				c.mu.Unlock()
+				if ok {
+					stream.running = false
+					if !stream.ended {
+						stream.underflow = true
+					}
 				}
 			default:
 				//fmt.Printf("%#v\n", msg)

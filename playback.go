@@ -5,24 +5,38 @@ import "github.com/jfreymuth/pulse/proto"
 // A PlaybackStream is used for playing audio.
 // When creating a stream, the user must provide a callback that will be used to buffer audio data.
 type PlaybackStream struct {
-	c       *Client
-	index   uint32
-	running bool
+	c         *Client
+	index     uint32
+	running   bool
+	ended     bool
+	underflow bool
+	err       error
 
 	buf            []byte
 	bytesPerSample int
 
-	cb8  func([]byte)
-	cb16 func([]int16)
-	cb32 func([]int32)
-	cbf  func([]float32)
+	cb func([]byte) error
 
 	createRequest proto.CreatePlaybackStream
 	createReply   proto.CreatePlaybackStreamReply
 }
 
+// EndOfData is a special error value that can be returned by a callback to stop the stream.
+const EndOfData endOfData = false
+
 // NewPlayback creates a playback stream.
-// The type of cb must be func([]byte), func([]int16), func([]int32), or func([]float32).
+// The type of cb must be one of the following:
+//   - func([]byte)
+//   - func([]int16)
+//   - func([]int32)
+//   - func([]float32)
+//   - func([]byte) error
+//   - func([]int16) error
+//   - func([]int32) error
+//   - func([]float32) error
+// If the callback returns any error, the stream will be stopped. The special error value EndOfData
+// can be used to intentionally stop the stream from within the callback.
+//
 // The created stream wil not be running, it must be started with Start().
 // The order of options is important in some cases, see the documentation of the individual PlaybackOptions.
 func (c *Client) NewPlayback(cb interface{}, opts ...PlaybackOption) (*PlaybackStream, error) {
@@ -35,27 +49,44 @@ func (c *Client) NewPlayback(cb interface{}, opts ...PlaybackOption) (*PlaybackS
 			BufferMaxLength:       proto.Undefined,
 			Corked:                true,
 			BufferTargetLength:    proto.Undefined,
-			BufferPrebufferLength: 0,
+			BufferPrebufferLength: proto.Undefined,
 			BufferMinimumRequest:  proto.Undefined,
 			Properties:            map[string]string{},
 		},
+		ended: true,
 	}
 
 	switch cb := cb.(type) {
-	case func([]byte):
-		p.cb8 = cb
+	case func([]byte) error:
+		p.cb = cb
 		p.createRequest.Format = proto.FormatUint8
 		p.bytesPerSample = 1
-	case func([]int16):
-		p.cb16 = cb
+	case func([]byte):
+		p.cb = func(buf []byte) error { cb(buf); return nil }
+		p.createRequest.Format = proto.FormatUint8
+		p.bytesPerSample = 1
+	case func([]int16) error:
+		p.cb = func(buf []byte) error { return cb(int16Slice(buf)) }
 		p.createRequest.Format = formatI16
 		p.bytesPerSample = 2
-	case func([]int32):
-		p.cb32 = cb
+	case func([]int16):
+		p.cb = func(buf []byte) error { cb(int16Slice(buf)); return nil }
+		p.createRequest.Format = formatI16
+		p.bytesPerSample = 2
+	case func([]int32) error:
+		p.cb = func(buf []byte) error { return cb(int32Slice(buf)) }
 		p.createRequest.Format = formatI32
 		p.bytesPerSample = 4
+	case func([]int32):
+		p.cb = func(buf []byte) error { cb(int32Slice(buf)); return nil }
+		p.createRequest.Format = formatI32
+		p.bytesPerSample = 4
+	case func([]float32) error:
+		p.cb = func(buf []byte) error { return cb(float32Slice(buf)) }
+		p.createRequest.Format = formatF32
+		p.bytesPerSample = 4
 	case func([]float32):
-		p.cbf = cb
+		p.cb = func(buf []byte) error { cb(float32Slice(buf)); return nil }
 		p.createRequest.Format = formatF32
 		p.bytesPerSample = 4
 	default:
@@ -86,15 +117,13 @@ func (p *PlaybackStream) buffer(n int) []byte {
 	if n > len(p.buf) {
 		p.buf = make([]byte, n)
 	}
-	switch {
-	case p.cb8 != nil:
-		p.cb8(p.buf[:n])
-	case p.cb16 != nil:
-		p.cb16(int16Slice(p.buf[:n]))
-	case p.cb32 != nil:
-		p.cb32(int32Slice(p.buf[:n]))
-	case p.cbf != nil:
-		p.cbf(float32Slice(p.buf[:n]))
+	err := p.cb(p.buf[:n])
+	if err != nil {
+		if err != EndOfData {
+			p.err = err
+		}
+		p.ended = true
+		return nil
 	}
 	return p.buf[:n]
 }
@@ -102,21 +131,45 @@ func (p *PlaybackStream) buffer(n int) []byte {
 // Start starts playing audio.
 func (p *PlaybackStream) Start() {
 	p.c.c.Request(&proto.FlushPlaybackStream{StreamIndex: p.index}, nil)
-	p.c.c.Send(p.index, p.buffer(int(p.createReply.BufferTargetLength)))
+	p.ended = false
+	buf := p.buffer(int(p.createReply.BufferTargetLength))
+	if buf == nil {
+		return
+	}
+	p.c.c.Send(p.index, buf)
 	p.c.c.Request(&proto.CorkPlaybackStream{StreamIndex: p.index, Corked: false}, nil)
 	p.running = true
+	p.underflow = false
 }
 
 // Stop stops playing audio; the callback will no longer be called.
+// If the buffer size/latency is large, audio may continue to play for some time after the call to Stop.
 func (p *PlaybackStream) Stop() {
+	p.ended = true
+}
+
+// Pause stops playing audio immediately.
+func (p *PlaybackStream) Pause() {
 	p.c.c.Request(&proto.CorkPlaybackStream{StreamIndex: p.index, Corked: true}, nil)
 	p.running = false
 }
 
-// Resume resumes a stopped stream.
+// Resume resumes a paused stream.
 func (p *PlaybackStream) Resume() {
-	p.c.c.Request(&proto.CorkPlaybackStream{StreamIndex: p.index, Corked: false}, nil)
-	p.running = true
+	if !p.ended {
+		p.c.c.Request(&proto.CorkPlaybackStream{StreamIndex: p.index, Corked: false}, nil)
+		p.running = true
+		p.underflow = false
+	}
+}
+
+// Drain waits until the playback has ended.
+// Drain does not return when the stream is paused.
+// If the stream's callback never returns an error, Drain may block forever.
+func (p *PlaybackStream) Drain() {
+	if p.running {
+		p.c.c.Request(&proto.DrainPlaybackStream{StreamIndex: p.index}, nil)
+	}
 }
 
 // Close closes the stream.
@@ -134,9 +187,15 @@ func (p *PlaybackStream) Closed() bool {
 }
 
 // Running returns wether the stream is currently playing.
-func (p *PlaybackStream) Running() bool {
-	return p.running
-}
+func (p *PlaybackStream) Running() bool { return p.running }
+
+// Underflow returns true if any underflows happend since the last call to Start or Resume.
+// Underflows usually happen because the latency/buffer size is too low or because the callback
+// takes too long to run.
+func (p *PlaybackStream) Underflow() bool { return p.underflow }
+
+// Error returns the last error returned by the stream's callback.
+func (p *PlaybackStream) Error() error { return p.err }
 
 // SampleRate returns the stream's sample rate (samples per second).
 func (p *PlaybackStream) SampleRate() int {
@@ -254,3 +313,7 @@ func PlaybackMediaIconName(name string) PlaybackOption {
 		p.createRequest.Properties["media.icon_name"] = name
 	}
 }
+
+type endOfData bool
+
+func (endOfData) Error() string { return "end of data" }

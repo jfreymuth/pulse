@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"math"
-	"os"
 
 	"github.com/jfreymuth/pulse"
 )
@@ -16,29 +15,24 @@ func main() {
 	}
 	defer c.Close()
 
-	s, err := c.DefaultSink()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	stream, err := c.NewPlayback(synth, pulse.PlaybackLowLatency(s))
+	stream, err := c.NewPlayback(synth, pulse.PlaybackLatency(.1))
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
 	stream.Start()
-
-	fmt.Print("Press enter to stop...")
-	os.Stdin.Read([]byte{0})
-
+	stream.Drain()
+	fmt.Println("Underflow:", stream.Underflow())
 	stream.Close()
 }
 
 var t, phase float32
 
-func synth(out []float32) {
+func synth(out []float32) error {
+	if t > 4 {
+		return pulse.EndOfData
+	}
 	for i := range out {
 		x := float32(math.Sin(2 * math.Pi * float64(phase)))
 		out[i] = x * 0.1
@@ -49,4 +43,5 @@ func synth(out []float32) {
 		}
 		t += 1. / 44100
 	}
+	return nil
 }

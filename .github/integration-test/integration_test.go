@@ -56,7 +56,7 @@ func TestIntegration(t *testing.T) {
 
 		record.Stop()
 		playback.Stop()
-		time.Sleep(100 * time.Millisecond)
+		playback.Drain()
 
 		if len(buf) > 256 {
 			break
