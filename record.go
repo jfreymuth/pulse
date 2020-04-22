@@ -141,6 +141,12 @@ func (r *RecordStream) Channels() int {
 	return int(r.createReply.Channels)
 }
 
+// StreamIndex returns the stream index.
+// This should only be used together with (*Cient).RawRequest.
+func (r *RecordStream) StreamIndex() uint32 {
+	return r.index
+}
+
 // A RecordOption supplies configuration when creating streams.
 type RecordOption func(*RecordStream)
 

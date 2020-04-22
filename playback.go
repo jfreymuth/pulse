@@ -218,6 +218,12 @@ func (p *PlaybackStream) BufferSizeBytes() int {
 	return int(p.createReply.BufferTargetLength)
 }
 
+// StreamIndex returns the stream index.
+// This should only be used together with (*Cient).RawRequest.
+func (p *PlaybackStream) StreamIndex() uint32 {
+	return p.index
+}
+
 // A PlaybackOption supplies configuration when creating streams.
 type PlaybackOption func(*PlaybackStream)
 
