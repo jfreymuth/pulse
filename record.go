@@ -64,11 +64,13 @@ func (c *Client) NewRecord(cb interface{}, opts ...RecordOption) (*RecordStream,
 		opt(r)
 	}
 
-	cvol := make(proto.ChannelVolumes, len(r.createRequest.ChannelMap))
-	for i := range cvol {
-		cvol[i] = 0x100
+	if r.createRequest.ChannelVolumes == nil {
+		cvol := make(proto.ChannelVolumes, len(r.createRequest.ChannelMap))
+		for i := range cvol {
+			cvol[i] = 0x100
+		}
+		r.createRequest.ChannelVolumes = cvol
 	}
-	r.createRequest.ChannelVolumes = cvol
 
 	err := c.c.Request(&r.createRequest, &r.createReply)
 	if err != nil {
@@ -231,5 +233,14 @@ func RecordMediaName(name string) RecordOption {
 func RecordMediaIconName(name string) RecordOption {
 	return func(r *RecordStream) {
 		r.createRequest.Properties["media.icon_name"] = name
+	}
+}
+
+// RecordRawOption can be used to create custom options.
+//
+// This is an advanced function, similar to (*Client).RawRequest.
+func RecordRawOption(o func(*proto.CreateRecordStream)) RecordOption {
+	return func(p *RecordStream) {
+		o(&p.createRequest)
 	}
 }

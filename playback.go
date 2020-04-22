@@ -97,11 +97,13 @@ func (c *Client) NewPlayback(cb interface{}, opts ...PlaybackOption) (*PlaybackS
 		opt(p)
 	}
 
-	cvol := make(proto.ChannelVolumes, len(p.createRequest.ChannelMap))
-	for i := range cvol {
-		cvol[i] = 0x100
+	if p.createRequest.ChannelVolumes == nil {
+		cvol := make(proto.ChannelVolumes, len(p.createRequest.ChannelMap))
+		for i := range cvol {
+			cvol[i] = 0x100
+		}
+		p.createRequest.ChannelVolumes = cvol
 	}
-	p.createRequest.ChannelVolumes = cvol
 
 	err := c.c.Request(&p.createRequest, &p.createReply)
 	if err != nil {
@@ -317,6 +319,15 @@ func PlaybackMediaName(name string) PlaybackOption {
 func PlaybackMediaIconName(name string) PlaybackOption {
 	return func(p *PlaybackStream) {
 		p.createRequest.Properties["media.icon_name"] = name
+	}
+}
+
+// PlaybackRawOption can be used to create custom options.
+//
+// This is an advanced function, similar to (*Client).RawRequest.
+func PlaybackRawOption(o func(*proto.CreatePlaybackStream)) PlaybackOption {
+	return func(p *PlaybackStream) {
+		o(&p.createRequest)
 	}
 }
 
