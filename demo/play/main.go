@@ -33,7 +33,6 @@ func main() {
 var t, phase float32
 
 func synth(out []float32) (int, error) {
-	out = out[:len(out)/2+1]
 	for i := range out {
 		if t > 4 {
 			return i, pulse.EndOfData
