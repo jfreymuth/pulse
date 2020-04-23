@@ -33,7 +33,7 @@ func TestIntegration(t *testing.T) {
 
 		var cnt uint32
 		playback, err := c.NewPlayback(
-			func(out []int16) {
+			pulse.Int16Reader(func(out []int16) (int, error) {
 				// Play rectangular wave
 				for i, _ := range out {
 					if cnt%16 < 8 {
@@ -43,7 +43,8 @@ func TestIntegration(t *testing.T) {
 					}
 					cnt++
 				}
-			},
+				return len(out), nil
+			}),
 			pulse.PlaybackBufferSize(256),
 		)
 		if err != nil {

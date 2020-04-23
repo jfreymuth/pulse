@@ -15,7 +15,7 @@ func main() {
 	}
 	defer c.Close()
 
-	stream, err := c.NewPlayback(synth, pulse.PlaybackLatency(.1))
+	stream, err := c.NewPlayback(pulse.Float32Reader(synth), pulse.PlaybackLatency(.1))
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -24,16 +24,20 @@ func main() {
 	stream.Start()
 	stream.Drain()
 	fmt.Println("Underflow:", stream.Underflow())
+	if stream.Error() != nil {
+		fmt.Println("Error:", stream.Error())
+	}
 	stream.Close()
 }
 
 var t, phase float32
 
-func synth(out []float32) error {
-	if t > 4 {
-		return pulse.EndOfData
-	}
+func synth(out []float32) (int, error) {
+	out = out[:len(out)/2+1]
 	for i := range out {
+		if t > 4 {
+			return i, pulse.EndOfData
+		}
 		x := float32(math.Sin(2 * math.Pi * float64(phase)))
 		out[i] = x * 0.1
 		f := [...]float32{440, 550, 660, 880}[int(2*t)&3]
@@ -43,5 +47,5 @@ func synth(out []float32) error {
 		}
 		t += 1. / 44100
 	}
-	return nil
+	return len(out), nil
 }
