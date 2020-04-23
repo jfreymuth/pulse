@@ -1,4 +1,4 @@
-package pulse
+package proto
 
 import (
 	"reflect"
