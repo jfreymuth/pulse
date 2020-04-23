@@ -22,9 +22,10 @@ func TestIntegration(t *testing.T) {
 		defer c.Close()
 
 		record, err := c.NewRecord(
-			func(in []int16) {
+			pulse.Int16Writer(func(in []int16) (int, error) {
 				buf = append(buf, in...)
-			},
+				return len(in), nil
+			}),
 			pulse.RecordBufferFragmentSize(256),
 		)
 		if err != nil {

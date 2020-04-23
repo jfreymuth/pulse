@@ -33,8 +33,8 @@ func NewFile(w io.WriteSeeker, sampleRate, channels int) *File {
 	return &File{out: w}
 }
 
-func (f *File) Write(p []float32) {
-	binary.Write(f.out, binary.LittleEndian, p)
+func (f *File) Write(p []float32) (int, error) {
+	return len(p), binary.Write(f.out, binary.LittleEndian, p)
 }
 
 func (f *File) Close() {

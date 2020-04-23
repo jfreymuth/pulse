@@ -8,56 +8,34 @@ type RecordStream struct {
 	c       *Client
 	index   uint32
 	running bool
+	err     error
 
+	w Writer
+
+	createRequest  proto.CreateRecordStream
+	createReply    proto.CreateRecordStreamReply
 	bytesPerSample int
-
-	cb8  func([]byte)
-	cb16 func([]int16)
-	cb32 func([]int32)
-	cbf  func([]float32)
-
-	createRequest proto.CreateRecordStream
-	createReply   proto.CreateRecordStreamReply
 }
 
 // NewRecord creates a record stream.
-// The type of cb must be func([]byte), func([]int16), func([]int32), or func([]float32).
+// If the reader returns any error, the stream will be stopped.
 // The created stream wil not be running, it must be started with Start().
 // The order of options is important in some cases, see the documentation of the individual RecordOptions.
-func (c *Client) NewRecord(cb interface{}, opts ...RecordOption) (*RecordStream, error) {
+func (c *Client) NewRecord(w Writer, opts ...RecordOption) (*RecordStream, error) {
 	r := &RecordStream{
 		c: c,
 		createRequest: proto.CreateRecordStream{
 			SourceIndex:        proto.Undefined,
 			ChannelMap:         proto.ChannelMap{proto.ChannelMono},
-			SampleSpec:         proto.SampleSpec{Channels: 1, Rate: 44100},
+			SampleSpec:         proto.SampleSpec{Format: w.Format(), Channels: 1, Rate: 44100},
 			BufferMaxLength:    proto.Undefined,
 			Corked:             true,
 			BufferFragSize:     proto.Undefined,
 			DirectOnInputIndex: proto.Undefined,
 			Properties:         map[string]string{},
 		},
-	}
-
-	switch cb := cb.(type) {
-	case func([]byte):
-		r.cb8 = cb
-		r.createRequest.Format = proto.FormatUint8
-		r.bytesPerSample = 1
-	case func([]int16):
-		r.cb16 = cb
-		r.createRequest.Format = formatI16
-		r.bytesPerSample = 2
-	case func([]int32):
-		r.cb32 = cb
-		r.createRequest.Format = formatI32
-		r.bytesPerSample = 4
-	case func([]float32):
-		r.cbf = cb
-		r.createRequest.Format = formatF32
-		r.bytesPerSample = 4
-	default:
-		panic("pulse: invalid callback type")
+		bytesPerSample: w.BytesPerSample(),
+		w:              w,
 	}
 
 	for _, opt := range opts {
@@ -76,6 +54,7 @@ func (c *Client) NewRecord(cb interface{}, opts ...RecordOption) (*RecordStream,
 	if err != nil {
 		return nil, err
 	}
+	r.index = r.createReply.StreamIndex
 	c.mu.Lock()
 	c.record[r.index] = r
 	c.mu.Unlock()
@@ -83,20 +62,19 @@ func (c *Client) NewRecord(cb interface{}, opts ...RecordOption) (*RecordStream,
 }
 
 func (r *RecordStream) write(buf []byte) {
-	switch {
-	case r.cb8 != nil:
-		r.cb8(buf)
-	case r.cb16 != nil:
-		r.cb16(int16Slice(buf))
-	case r.cb32 != nil:
-		r.cb32(int32Slice(buf))
-	case r.cbf != nil:
-		r.cbf(float32Slice(buf))
+	if r.err != nil {
+		return
+	}
+	_, err := r.w.Write(buf)
+	if err != nil {
+		r.err = err
+		go r.Stop()
 	}
 }
 
 // Start starts recording audio.
 func (r *RecordStream) Start() {
+	r.err = nil
 	r.c.c.Request(&proto.FlushRecordStream{StreamIndex: r.index}, nil)
 	r.c.c.Request(&proto.CorkRecordStream{StreamIndex: r.index, Corked: false}, nil)
 	r.running = true
@@ -105,13 +83,6 @@ func (r *RecordStream) Start() {
 // Stop stops recording audio; the callback will no longer be called.
 func (r *RecordStream) Stop() {
 	r.c.c.Request(&proto.CorkRecordStream{StreamIndex: r.index, Corked: true}, nil)
-	r.running = false
-}
-
-// Resume resumes a stopped stream.
-func (r *RecordStream) Resume() {
-	r.c.c.Request(&proto.CorkRecordStream{StreamIndex: r.index, Corked: false}, nil)
-	r.running = true
 }
 
 // Close closes the stream.
@@ -147,6 +118,11 @@ func (r *RecordStream) Channels() int {
 // This should only be used together with (*Cient).RawRequest.
 func (r *RecordStream) StreamIndex() uint32 {
 	return r.index
+}
+
+// Error returns the last error returned by the stream's writer.
+func (r *RecordStream) Error() error {
+	return r.err
 }
 
 // A RecordOption supplies configuration when creating streams.

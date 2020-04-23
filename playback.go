@@ -29,10 +29,9 @@ type PlaybackStream struct {
 const EndOfData endOfData = false
 
 // NewPlayback creates a playback stream.
+// The created stream wil not be running, it must be started with Start().
 // If the reader returns any error, the stream will be stopped. The special error value EndOfData
 // can be used to intentionally stop the stream from within the callback.
-//
-// The created stream wil not be running, it must be started with Start().
 // The order of options is important in some cases, see the documentation of the individual PlaybackOptions.
 func (c *Client) NewPlayback(r Reader, opts ...PlaybackOption) (*PlaybackStream, error) {
 	p := &PlaybackStream{
@@ -114,6 +113,7 @@ func (p *PlaybackStream) run() {
 func (p *PlaybackStream) Start() {
 	p.c.c.Request(&proto.FlushPlaybackStream{StreamIndex: p.index}, nil)
 	p.ended = false
+	p.err = nil
 	p.request <- int(p.createReply.BufferTargetLength)
 	p.running = true
 	p.underflow = false

@@ -15,6 +15,13 @@ type Reader interface {
 	BytesPerSample() int
 }
 
+// A Writer accepts audio data in a specific format.
+type Writer interface {
+	io.Writer
+	Format() byte // Format should return one of the format constants defined by the proto package
+	BytesPerSample() int
+}
+
 // Uint8Reader implements the Reader interface.
 // The semantics are the same as io.Reader's Read.
 type Uint8Reader func([]byte) (int, error)
@@ -33,6 +40,37 @@ type Int32Reader func([]int32) (int, error)
 // The semantics are the same as io.Reader's Read, but it returns
 // the number of float32 values read, not the number of bytes.
 type Float32Reader func([]float32) (int, error)
+
+// NewReader creates a reader from an io.Reader and a format.
+// The format must be one of the constants defined in the proto package.
+func NewReader(r io.Reader, format byte) Reader {
+	return &reader{r, format, bytes(format)}
+}
+
+// Uint8Writer implements the Writer interface.
+// The semantics are the same as io.Writer's Write.
+type Uint8Writer func([]byte) (int, error)
+
+// Int16Writer implements the Writer interface.
+// The semantics are the same as io.Writer's Write, but it returns
+// the number of int16 values written, not the number of bytes.
+type Int16Writer func([]int16) (int, error)
+
+// Int32Writer implements the Writer interface.
+// The semantics are the same as io.Writer's Write, but it returns
+// the number of int32 values written, not the number of bytes.
+type Int32Writer func([]int32) (int, error)
+
+// Float32Writer implements the Writer interface.
+// The semantics are the same as io.Writer's Write, but it returns
+// the number of float32 values written, not the number of bytes.
+type Float32Writer func([]float32) (int, error)
+
+// NewWriter creates a writer from an io.Writer and a format.
+// The format must be one of the constants defined in the proto package.
+func NewWriter(w io.Writer, format byte) Writer {
+	return &writer{w, format, bytes(format)}
+}
 
 func (c Uint8Reader) Read(buf []byte) (int, error) { return c(buf) }
 func (c Uint8Reader) Format() byte                 { return proto.FormatUint8 }
@@ -58,6 +96,63 @@ func (c Float32Reader) Read(buf []byte) (int, error) {
 }
 func (c Float32Reader) Format() byte        { return formatF32 }
 func (c Float32Reader) BytesPerSample() int { return 2 }
+
+func (c Uint8Writer) Write(buf []byte) (int, error) { return c(buf) }
+func (c Uint8Writer) Format() byte                  { return proto.FormatUint8 }
+func (c Uint8Writer) BytesPerSample() int           { return 1 }
+
+func (c Int16Writer) Write(buf []byte) (int, error) {
+	n, err := c(int16Slice(buf))
+	return n * 2, err
+}
+func (c Int16Writer) Format() byte        { return formatI16 }
+func (c Int16Writer) BytesPerSample() int { return 2 }
+
+func (c Int32Writer) Write(buf []byte) (int, error) {
+	n, err := c(int32Slice(buf))
+	return n * 4, err
+}
+func (c Int32Writer) Format() byte        { return formatI32 }
+func (c Int32Writer) BytesPerSample() int { return 2 }
+
+func (c Float32Writer) Write(buf []byte) (int, error) {
+	n, err := c(float32Slice(buf))
+	return n * 4, err
+}
+func (c Float32Writer) Format() byte        { return formatF32 }
+func (c Float32Writer) BytesPerSample() int { return 2 }
+
+type reader struct {
+	r io.Reader
+	f byte
+	b int
+}
+
+func (r *reader) Read(buf []byte) (int, error) { return r.r.Read(buf) }
+func (r *reader) Format() byte                 { return r.f }
+func (r *reader) BytesPerSample() int          { return r.b }
+
+type writer struct {
+	w io.Writer
+	f byte
+	b int
+}
+
+func (w *writer) Write(buf []byte) (int, error) { return w.w.Write(buf) }
+func (w *writer) Format() byte                  { return w.f }
+func (w *writer) BytesPerSample() int           { return w.b }
+
+func bytes(f byte) int {
+	switch f {
+	case proto.FormatUint8:
+		return 1
+	case proto.FormatInt16LE, proto.FormatInt16BE:
+		return 2
+	case proto.FormatInt32LE, proto.FormatInt32BE, proto.FormatFloat32LE, proto.FormatFloat32BE:
+		return 4
+	}
+	panic("pulse: invalid format")
+}
 
 var formatI16, formatI32, formatF32 byte
 

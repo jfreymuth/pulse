@@ -16,7 +16,7 @@ func main() {
 	defer c.Close()
 
 	file := CreateFile("out.wav", 44100, 1)
-	stream, err := c.NewRecord(file.Write)
+	stream, err := c.NewRecord(pulse.Float32Writer(file.Write))
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -26,5 +26,6 @@ func main() {
 
 	fmt.Print("Press enter to stop...")
 	os.Stdin.Read([]byte{0})
+	stream.Stop()
 	file.Close()
 }
