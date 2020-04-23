@@ -17,10 +17,15 @@ type Client struct {
 	nextID     uint32
 	awaitReply map[uint32]AwaitReply
 
-	err     chan error
-	request chan uint32
+	send chan send
+	err  chan error
 
 	Callback func(interface{})
+}
+
+type send struct {
+	index uint32
+	data  []byte
 }
 
 func (c *Client) Version() Version {
@@ -38,10 +43,11 @@ func (c *Client) Open(rw io.ReadWriter) {
 	c.w.w = rw
 	c.v = Version(32)
 
+	c.send = make(chan send)
 	c.awaitReply = make(map[uint32]AwaitReply)
 	c.err = make(chan error, 4)
-	c.request = make(chan uint32, 4)
 	go c.readLoop()
+	go c.writeLoop()
 }
 
 type AwaitReply struct {
@@ -54,10 +60,10 @@ func (c *Client) Request(req RequestArgs, rpl Reply) error {
 		panic("pulse: wrong reply type")
 	}
 
+	reply := make(chan interface{}, 1)
 	c.replyM.Lock()
 	tag := c.nextID
 	c.nextID++
-	reply := make(chan interface{}, 1)
 	c.awaitReply[tag] = AwaitReply{rpl, reply}
 	c.replyM.Unlock()
 
@@ -70,7 +76,7 @@ func (c *Client) Request(req RequestArgs, rpl Reply) error {
 	w.value(req, c.v)
 	w.flush()
 
-	c.Send(0xFFFFFFFF, buf.Bytes())
+	c.send <- send{0xFFFFFFFF, buf.Bytes()}
 
 	select {
 	case <-reply:
@@ -81,12 +87,18 @@ func (c *Client) Request(req RequestArgs, rpl Reply) error {
 }
 
 func (c *Client) Send(index uint32, data []byte) {
-	c.w.uint32(uint32(len(data)))
-	c.w.uint32(index)
-	c.w.uint64(0)
-	c.w.uint32(0)
-	c.w.flush()
-	c.w.w.Write(data)
+	c.send <- send{index, data}
+}
+
+func (c *Client) writeLoop() {
+	for s := range c.send {
+		c.w.uint32(uint32(len(s.data)))
+		c.w.uint32(s.index)
+		c.w.uint64(0)
+		c.w.uint32(0)
+		c.w.flush()
+		c.w.w.Write(s.data)
+	}
 }
 
 func (c *Client) readLoop() {
@@ -115,7 +127,10 @@ func (c *Client) readLoop() {
 					c.err <- err
 				}
 			case OpReply:
-				if a, ok := c.awaitReply[tag]; ok {
+				c.replyM.Lock()
+				a, ok := c.awaitReply[tag]
+				c.replyM.Unlock()
+				if ok {
 					if a.value != nil {
 						if reflect.TypeOf(a.value).Elem().Kind() == reflect.Slice {
 							c.parseInfoList(a.value, int(length)-10)
