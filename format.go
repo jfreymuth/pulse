@@ -26,12 +26,12 @@ type Int16Reader func([]int16) (int, error)
 
 // Int32Reader implements the Reader interface.
 // The semantics are the same as io.Reader's Read, but it returns
-// the number of int16 values read, not the number of bytes.
+// the number of int32 values read, not the number of bytes.
 type Int32Reader func([]int32) (int, error)
 
 // Float32Reader implements the Reader interface.
 // The semantics are the same as io.Reader's Read, but it returns
-// the number of int16 values read, not the number of bytes.
+// the number of float32 values read, not the number of bytes.
 type Float32Reader func([]float32) (int, error)
 
 func (c Uint8Reader) Read(buf []byte) (int, error) { return c(buf) }
