@@ -290,7 +290,7 @@ type GetPlaybackLatency struct {
 }
 type GetPlaybackLatencyReply struct {
 	Latency     Microseconds
-	_           Microseconds
+	Unused      Microseconds // always 0
 	Running     bool
 	RequestTime Time
 	ReplyTime   Time
