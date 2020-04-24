@@ -297,8 +297,8 @@ type GetPlaybackLatencyReply struct {
 	WriteIndex  int64
 	ReadIndex   int64
 
-	UnderrunFor int64 "13"
-	PlayingFor  int64 "13"
+	UnderrunFor uint64 "13"
+	PlayingFor  uint64 "13"
 }
 
 type GetRecordLatency struct {
