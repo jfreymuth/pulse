@@ -88,14 +88,14 @@ func (c Int32Reader) Read(buf []byte) (int, error) {
 	return n * 4, err
 }
 func (c Int32Reader) Format() byte        { return formatI32 }
-func (c Int32Reader) BytesPerSample() int { return 2 }
+func (c Int32Reader) BytesPerSample() int { return 4 }
 
 func (c Float32Reader) Read(buf []byte) (int, error) {
 	n, err := c(float32Slice(buf))
 	return n * 4, err
 }
 func (c Float32Reader) Format() byte        { return formatF32 }
-func (c Float32Reader) BytesPerSample() int { return 2 }
+func (c Float32Reader) BytesPerSample() int { return 4 }
 
 func (c Uint8Writer) Write(buf []byte) (int, error) { return c(buf) }
 func (c Uint8Writer) Format() byte                  { return proto.FormatUint8 }
@@ -113,14 +113,14 @@ func (c Int32Writer) Write(buf []byte) (int, error) {
 	return n * 4, err
 }
 func (c Int32Writer) Format() byte        { return formatI32 }
-func (c Int32Writer) BytesPerSample() int { return 2 }
+func (c Int32Writer) BytesPerSample() int { return 4 }
 
 func (c Float32Writer) Write(buf []byte) (int, error) {
 	n, err := c(float32Slice(buf))
 	return n * 4, err
 }
 func (c Float32Writer) Format() byte        { return formatF32 }
-func (c Float32Writer) BytesPerSample() int { return 2 }
+func (c Float32Writer) BytesPerSample() int { return 4 }
 
 type reader struct {
 	r io.Reader
