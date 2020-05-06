@@ -16,9 +16,9 @@ type Client struct {
 	replyM     sync.Mutex
 	nextID     uint32
 	awaitReply map[uint32]AwaitReply
+	err        error
 
 	send chan send
-	err  chan error
 
 	Callback func(interface{})
 }
@@ -45,14 +45,13 @@ func (c *Client) Open(rw io.ReadWriter) {
 
 	c.send = make(chan send)
 	c.awaitReply = make(map[uint32]AwaitReply)
-	c.err = make(chan error, 4)
 	go c.readLoop()
 	go c.writeLoop()
 }
 
 type AwaitReply struct {
 	value interface{}
-	reply chan<- interface{}
+	reply chan<- error
 }
 
 func (c *Client) Request(req RequestArgs, rpl Reply) error {
@@ -60,8 +59,12 @@ func (c *Client) Request(req RequestArgs, rpl Reply) error {
 		panic("pulse: wrong reply type")
 	}
 
-	reply := make(chan interface{}, 1)
+	reply := make(chan error, 1)
 	c.replyM.Lock()
+	if c.err != nil {
+		c.replyM.Unlock()
+		return c.err
+	}
 	tag := c.nextID
 	c.nextID++
 	c.awaitReply[tag] = AwaitReply{rpl, reply}
@@ -78,12 +81,7 @@ func (c *Client) Request(req RequestArgs, rpl Reply) error {
 
 	c.send <- send{0xFFFFFFFF, buf.Bytes()}
 
-	select {
-	case <-reply:
-		return nil
-	case err := <-c.err:
-		return err
-	}
+	return <-reply
 }
 
 func (c *Client) Send(index uint32, data []byte) {
@@ -109,9 +107,8 @@ func (c *Client) readLoop() {
 		flags := c.r.uint32()
 		_, _ = offset, flags
 		if c.r.err != nil {
-			for {
-				c.err <- c.r.err
-			}
+			c.error(c.err)
+			return
 		}
 		if index == 0xFFFFFFFF {
 			c.r.byte() // L
@@ -123,8 +120,11 @@ func (c *Client) readLoop() {
 			case OpError:
 				c.r.byte()
 				err := Error(c.r.uint32())
-				for {
-					c.err <- err
+				c.replyM.Lock()
+				a, ok := c.awaitReply[tag]
+				c.replyM.Unlock()
+				if ok {
+					a.reply <- err
 				}
 			case OpReply:
 				c.replyM.Lock()
@@ -140,7 +140,7 @@ func (c *Client) readLoop() {
 					} else {
 						c.r.advance(int(length) - 10)
 					}
-					a.reply <- a.value
+					a.reply <- nil
 				} else {
 					c.r.advance(int(length) - 10)
 				}
@@ -191,6 +191,19 @@ func (c *Client) readLoop() {
 			}
 			c.r.advance(int(length))
 		}
+	}
+}
+
+func (c *Client) error(err error) {
+	c.replyM.Lock()
+	c.err = err
+	ch := make([]chan<- error, len(c.awaitReply))
+	for _, a := range c.awaitReply {
+		ch = append(ch, a.reply)
+	}
+	c.replyM.Unlock()
+	for _, ch := range ch {
+		ch <- err
 	}
 }
 
