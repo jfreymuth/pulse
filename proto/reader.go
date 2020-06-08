@@ -171,7 +171,11 @@ func (p *ProtocolReader) propList(out map[string]string) {
 			p.setErr(ErrProtocolError)
 			return
 		}
-		out[key] = string(value[:len(value)-1])
+		if len(value) <= 1 {
+			out[key] = ""
+		} else {
+			out[key] = string(value[:len(value)-1])
+		}
 	}
 }
 
