@@ -32,7 +32,7 @@ func (c *Client) NewRecord(w Writer, opts ...RecordOption) (*RecordStream, error
 			Corked:             true,
 			BufferFragSize:     proto.Undefined,
 			DirectOnInputIndex: proto.Undefined,
-			Properties:         map[string]string{},
+			Properties:         proto.PropList{},
 		},
 		bytesPerSample: w.BytesPerSample(),
 		w:              w,
@@ -200,7 +200,7 @@ func RecordMonitor(sink *Sink) RecordOption {
 // This will e.g. be displayed by a volume control application to identity the stream.
 func RecordMediaName(name string) RecordOption {
 	return func(r *RecordStream) {
-		r.createRequest.Properties["media.name"] = name
+		r.createRequest.Properties["media.name"] = proto.PropListString(name)
 	}
 }
 
@@ -208,7 +208,7 @@ func RecordMediaName(name string) RecordOption {
 // This will e.g. be displayed by a volume control application to identity the stream.
 func RecordMediaIconName(name string) RecordOption {
 	return func(r *RecordStream) {
-		r.createRequest.Properties["media.icon_name"] = name
+		r.createRequest.Properties["media.icon_name"] = proto.PropListString(name)
 	}
 }
 

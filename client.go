@@ -20,19 +20,19 @@ type Client struct {
 	record   map[uint32]*RecordStream
 
 	server string
-	props  map[string]string
+	props  proto.PropList
 }
 
 // NewClient connects to the server.
 func NewClient(opts ...ClientOption) (*Client, error) {
 	c := &Client{
-		props: map[string]string{
-			"media.name":                 "go audio",
-			"application.name":           path.Base(os.Args[0]),
-			"application.icon_name":      "audio-x-generic",
-			"application.process.id":     fmt.Sprintf("%d", os.Getpid()),
-			"application.process.binary": os.Args[0],
-			"window.x11.display":         os.Getenv("DISPLAY"),
+		props: proto.PropList{
+			"media.name":                 proto.PropListString("go audio"),
+			"application.name":           proto.PropListString(path.Base(os.Args[0])),
+			"application.icon_name":      proto.PropListString("audio-x-generic"),
+			"application.process.id":     proto.PropListString(fmt.Sprintf("%d", os.Getpid())),
+			"application.process.binary": proto.PropListString(os.Args[0]),
+			"window.x11.display":         proto.PropListString(os.Getenv("DISPLAY")),
 		},
 	}
 	for _, opt := range opts {
@@ -106,13 +106,13 @@ type ClientOption func(*Client)
 // This will e.g. be displayed by a volume control application to identity the application.
 // It should be human-readable and localized.
 func ClientApplicationName(name string) ClientOption {
-	return func(c *Client) { c.props["application.name"] = name }
+	return func(c *Client) { c.props["application.name"] = proto.PropListString(name) }
 }
 
 // ClientApplicationIconName sets the application icon using an xdg icon name.
 // This will e.g. be displayed by a volume control application to identity the application.
 func ClientApplicationIconName(name string) ClientOption {
-	return func(c *Client) { c.props["application.icon_name"] = name }
+	return func(c *Client) { c.props["application.icon_name"] = proto.PropListString(name) }
 }
 
 // ClientServerString will override the default server strings.

@@ -90,14 +90,14 @@ func (p *ProtocolWriter) xstring(x string) {
 	p.byte(0)
 }
 
-func (p *ProtocolWriter) propList(list map[string]string) {
+func (p *ProtocolWriter) propList(list PropList) {
 	for k, v := range list {
 		p.byte('t')
 		p.string(k)
 		p.byte('L')
-		p.uint32(uint32(len(v)) + 1)
+		p.uint32(uint32(len(v)))
 		p.byte('x')
-		p.xstring(v)
+		p.x(v)
 	}
 	p.byte('N')
 }
@@ -178,7 +178,7 @@ func (p *ProtocolWriter) value(i interface{}, version Version) {
 			for i := range f {
 				p.uint32(f[i])
 			}
-		case map[string]string:
+		case PropList:
 			p.byte('P')
 			p.propList(f)
 		case Volume:

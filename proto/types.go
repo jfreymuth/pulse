@@ -64,5 +64,21 @@ type Volume uint32
 
 type FormatInfo struct {
 	Encoding   byte
-	Properties map[string]string
+	Properties PropList
+}
+
+type PropList map[string]PropListEntry
+
+type PropListEntry []byte
+
+func PropListString(s string) PropListEntry {
+	e := make(PropListEntry, len(s)+1)
+	copy(e, s)
+	return e
+}
+func (e PropListEntry) String() string {
+	if len(e) == 0 || e[len(e)-1] != '\x00' {
+		return "<not a string>"
+	}
+	return string(e[:len(e)-1])
 }

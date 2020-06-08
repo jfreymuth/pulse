@@ -144,7 +144,7 @@ func (p *ProtocolReader) x() []byte {
 	return x
 }
 
-func (p *ProtocolReader) propList(out map[string]string) {
+func (p *ProtocolReader) propList(out PropList) {
 	for p.err == nil {
 		keyType := p.byte()
 		if keyType == 'N' {
@@ -171,7 +171,7 @@ func (p *ProtocolReader) propList(out map[string]string) {
 			p.setErr(ErrProtocolError)
 			return
 		}
-		out[key] = string(value[:len(value)-1])
+		out[key] = PropListEntry(value)
 	}
 }
 
@@ -202,7 +202,7 @@ func (p *ProtocolReader) value(i interface{}, version Version) {
 					p.byte() // B
 					fi[i].Encoding = p.byte()
 					p.byte() // P
-					fi[i].Properties = make(map[string]string)
+					fi[i].Properties = make(PropList)
 					p.propList(fi[i].Properties)
 				}
 			} else {
@@ -258,13 +258,13 @@ func (p *ProtocolReader) value(i interface{}, version Version) {
 			}
 			f.Set(reflect.ValueOf(u))
 		case 'P':
-			m := make(map[string]string)
+			m := make(PropList)
 			p.propList(m)
 			f.Set(reflect.ValueOf(m))
 		case 'V':
 			f.SetUint(uint64(p.uint32()))
 		case 'f':
-			m := make(map[string]string)
+			m := make(PropList)
 			p.byte() // B
 			enc := p.byte()
 			p.byte() // P

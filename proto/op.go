@@ -152,9 +152,9 @@ type CreatePlaybackStream struct {
 	NoMove       bool "12"
 	VariableRate bool "12"
 
-	Muted         bool              "13"
-	AdjustLatency bool              "13"
-	Properties    map[string]string "13"
+	Muted         bool     "13"
+	AdjustLatency bool     "13"
+	Properties    PropList "13"
 
 	VolumeSet     bool "14"
 	EarlyRequests bool "14"
@@ -210,10 +210,10 @@ type CreateRecordStream struct {
 	NoMove       bool "12"
 	VariableRate bool "12"
 
-	PeakDetect         bool              "13"
-	AdjustLatency      bool              "13"
-	Properties         map[string]string "13"
-	DirectOnInputIndex uint32            "13"
+	PeakDetect         bool     "13"
+	AdjustLatency      bool     "13"
+	Properties         PropList "13"
+	DirectOnInputIndex uint32   "13"
 
 	EarlyRequests bool "14"
 
@@ -259,7 +259,7 @@ type AuthReply struct {
 }
 
 type SetClientName struct {
-	Props map[string]string
+	Props PropList
 }
 type SetClientNameReply struct {
 	ClientIndex uint32
@@ -321,7 +321,7 @@ type CreateUploadStream struct {
 	ChannelMap ChannelMap
 	Length     uint32
 
-	Properties map[string]string "13"
+	Properties PropList "13"
 }
 type CreateUploadStreamReply struct {
 	StreamIndex uint32
@@ -340,7 +340,7 @@ type PlaySample struct {
 	Volume    uint32
 	Name      string
 
-	Properties map[string]string "13"
+	Properties PropList "13"
 }
 
 type RemoveSample struct {
@@ -382,8 +382,8 @@ type GetSinkInfoReply struct {
 	Driver             string
 	Flags              uint32
 
-	Properties       map[string]string "13"
-	RequestedLatency Microseconds      "13"
+	Properties       PropList     "13"
+	RequestedLatency Microseconds "13"
 
 	BaseVolume     Volume "15"
 	State          uint32 "15"
@@ -420,8 +420,8 @@ type GetSourceInfoReply struct {
 	Driver             string
 	Flags              uint32
 
-	Properties       map[string]string "13"
-	RequestedLatency Microseconds      "13"
+	Properties       PropList     "13"
+	RequestedLatency Microseconds "13"
 
 	BaseVolume     Volume "15"
 	State          uint32 "15"
@@ -446,7 +446,7 @@ type GetClientInfoReply struct {
 	ModuleIndex uint32
 	Driver      string
 
-	Properties map[string]string "13"
+	Properties PropList "13"
 }
 
 type GetCardInfo struct{ CardIndex uint32 }
@@ -465,7 +465,7 @@ type GetCardInfoReply struct {
 		Available   uint32 "29"
 	}
 	ActiveProfileName string
-	Properties        map[string]string
+	Properties        PropList
 
 	Ports []struct {
 		Name        string
@@ -473,7 +473,7 @@ type GetCardInfoReply struct {
 		Priority    uint32
 		Available   uint32
 		Direction   byte
-		Properties  map[string]string
+		Properties  PropList
 		Profiles    []struct {
 			Name string
 		}
@@ -488,8 +488,8 @@ type GetModuleInfoReply struct {
 	ModuleArgs  string
 	Users       uint32
 
-	Properties map[string]string "15"
-	AutoLoad   bool              "<15"
+	Properties PropList "15"
+	AutoLoad   bool     "<15"
 }
 
 type GetSinkInputInfo struct{ SinkInputIndex uint32 }
@@ -510,7 +510,7 @@ type GetSinkInputInfoReply struct {
 
 	Muted bool "11"
 
-	Properties map[string]string "13"
+	Properties PropList "13"
 
 	Corked bool "19"
 
@@ -535,7 +535,7 @@ type GetSourceOutputInfoReply struct {
 	ResampleMethod     string
 	Driver             string
 
-	Properties map[string]string "13"
+	Properties PropList "13"
 
 	Corked bool "19"
 
@@ -561,7 +561,7 @@ type GetSampleInfoReply struct {
 	Lazy       bool
 	Filename   string
 
-	Properties map[string]string "13"
+	Properties PropList "13"
 }
 
 type GetSinkInfoList struct{}
@@ -692,30 +692,30 @@ type UpdateRecordStreamSampleRate struct {
 type UpdatePlaybackStreamProplist struct {
 	StreamIndex uint32
 	Mode        uint32
-	Properties  map[string]string
+	Properties  PropList
 }
 
 type UpdateRecordStreamProplist struct {
 	StreamIndex uint32
 	Mode        uint32
-	Properties  map[string]string
+	Properties  PropList
 }
 
 type UpdateClientProplist struct {
 	Mode       uint32
-	Properties map[string]string
+	Properties PropList
 }
 
 type RemovePlaybackStreamProplist struct {
 	StreamIndex uint32
-	Properties  map[string]string // ignored
+	Properties  PropList // ignored
 }
 type RemoveRecordStreamProplist struct {
 	StreamIndex uint32
-	Properties  map[string]string // ignored
+	Properties  PropList // ignored
 }
 type RemoveClientProplist struct {
-	Properties map[string]string // ignored
+	Properties PropList // ignored
 }
 
 type SetDefaultSink struct{ SinkName string }
@@ -971,19 +971,19 @@ type Started struct{ StreamIndex uint32 }
 
 type ClientEvent struct {
 	Event      string
-	Properties map[string]string
+	Properties PropList
 }
 
 type PlaybackStreamEvent struct {
 	StreamIndex uint32
 	Event       string
-	Properties  map[string]string
+	Properties  PropList
 }
 
 type RecordStreamEvent struct {
 	StreamIndex uint32
 	Event       string
-	Properties  map[string]string
+	Properties  PropList
 }
 
 type PlaybackBufferAttrChanged struct {

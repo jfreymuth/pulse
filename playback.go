@@ -45,7 +45,7 @@ func (c *Client) NewPlayback(r Reader, opts ...PlaybackOption) (*PlaybackStream,
 			BufferTargetLength:    proto.Undefined,
 			BufferPrebufferLength: proto.Undefined,
 			BufferMinimumRequest:  proto.Undefined,
-			Properties:            map[string]string{},
+			Properties:            proto.PropList{},
 		},
 		ended:          true,
 		bytesPerSample: r.BytesPerSample(),
@@ -286,7 +286,7 @@ func PlaybackLowLatency(sink *Sink) PlaybackOption {
 // This will e.g. be displayed by a volume control application to identity the stream.
 func PlaybackMediaName(name string) PlaybackOption {
 	return func(p *PlaybackStream) {
-		p.createRequest.Properties["media.name"] = name
+		p.createRequest.Properties["media.name"] = proto.PropListString(name)
 	}
 }
 
@@ -294,7 +294,7 @@ func PlaybackMediaName(name string) PlaybackOption {
 // This will e.g. be displayed by a volume control application to identity the stream.
 func PlaybackMediaIconName(name string) PlaybackOption {
 	return func(p *PlaybackStream) {
-		p.createRequest.Properties["media.icon_name"] = name
+		p.createRequest.Properties["media.icon_name"] = proto.PropListString(name)
 	}
 }
 
