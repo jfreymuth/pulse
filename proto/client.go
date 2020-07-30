@@ -114,7 +114,7 @@ func (c *Client) readLoop() {
 		flags := c.r.uint32()
 		_, _ = offset, flags
 		if c.r.err != nil {
-			c.error(c.err)
+			c.error(c.r.err)
 			return
 		}
 		if index == 0xFFFFFFFF {
