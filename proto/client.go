@@ -58,7 +58,7 @@ type AwaitReply struct {
 
 func (c *Client) Request(req RequestArgs, rpl Reply) error {
 	if rpl != nil && req.command() != rpl.IsReplyTo() {
-		panic("pulse: wrong reply type")
+		return fmt.Errorf("pulse: wrong reply type, got %d but expected %d", rpl.IsReplyTo(), req.command())
 	}
 
 	reply := make(chan error, 1)
