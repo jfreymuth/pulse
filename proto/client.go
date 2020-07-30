@@ -71,6 +71,11 @@ func (c *Client) Request(req RequestArgs, rpl Reply) error {
 	c.nextID++
 	c.awaitReply[tag] = AwaitReply{rpl, reply}
 	c.replyM.Unlock()
+	defer func() {
+		c.replyM.Lock()
+		delete(c.awaitReply, tag)
+		c.replyM.Unlock()
+	}()
 
 	var buf bytes.Buffer
 	w := ProtocolWriter{w: &buf}
