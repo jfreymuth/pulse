@@ -213,7 +213,9 @@ func (c *Client) error(err error) {
 		ch <- err
 	}
 	if errors.Is(err, io.EOF) && (c.OnConnectionClosed != nil) {
-		c.OnConnectionClosed()
+		go func() {
+			c.OnConnectionClosed()
+		}()
 	}
 }
 
