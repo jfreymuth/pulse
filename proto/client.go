@@ -2,6 +2,7 @@ package proto
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -20,7 +21,8 @@ type Client struct {
 
 	send chan send
 
-	Callback func(interface{})
+	Callback           func(interface{})
+	OnConnectionClosed func()
 }
 
 type send struct {
@@ -204,6 +206,9 @@ func (c *Client) error(err error) {
 	c.replyM.Unlock()
 	for _, r := range r {
 		r.reply <- err
+	}
+	if errors.Is(err, io.EOF) && (c.OnConnectionClosed != nil) {
+		c.OnConnectionClosed()
 	}
 }
 
