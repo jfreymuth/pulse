@@ -58,7 +58,7 @@ type AwaitReply struct {
 
 func (c *Client) Request(req RequestArgs, rpl Reply) error {
 	if rpl != nil && req.command() != rpl.IsReplyTo() {
-		return fmt.Errorf("pulse: wrong reply type, got %d but expected %d", rpl.IsReplyTo(), req.command())
+		panic("pulse: wrong reply type")
 	}
 
 	reply := make(chan error, 1)
@@ -71,11 +71,6 @@ func (c *Client) Request(req RequestArgs, rpl Reply) error {
 	c.nextID++
 	c.awaitReply[tag] = AwaitReply{rpl, reply}
 	c.replyM.Unlock()
-	defer func() {
-		c.replyM.Lock()
-		delete(c.awaitReply, tag)
-		c.replyM.Unlock()
-	}()
 
 	var buf bytes.Buffer
 	w := ProtocolWriter{w: &buf}
@@ -213,9 +208,7 @@ func (c *Client) error(err error) {
 		r.reply <- err
 	}
 	if errors.Is(err, io.EOF) && (c.OnConnectionClosed != nil) {
-		go func() {
-			c.OnConnectionClosed()
-		}()
+		c.OnConnectionClosed()
 	}
 }
 
