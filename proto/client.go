@@ -107,7 +107,7 @@ func (c *Client) readLoop() {
 		flags := c.r.uint32()
 		_, _ = offset, flags
 		if c.r.err != nil {
-			c.error(c.err)
+			c.error(c.r.err)
 			return
 		}
 		if index == 0xFFFFFFFF {
@@ -122,6 +122,7 @@ func (c *Client) readLoop() {
 				err := Error(c.r.uint32())
 				c.replyM.Lock()
 				a, ok := c.awaitReply[tag]
+				delete(c.awaitReply, tag)
 				c.replyM.Unlock()
 				if ok {
 					a.reply <- err
@@ -129,6 +130,7 @@ func (c *Client) readLoop() {
 			case OpReply:
 				c.replyM.Lock()
 				a, ok := c.awaitReply[tag]
+				delete(c.awaitReply, tag)
 				c.replyM.Unlock()
 				if ok {
 					if a.value != nil {
@@ -197,13 +199,11 @@ func (c *Client) readLoop() {
 func (c *Client) error(err error) {
 	c.replyM.Lock()
 	c.err = err
-	ch := make([]chan<- error, len(c.awaitReply))
-	for _, a := range c.awaitReply {
-		ch = append(ch, a.reply)
-	}
+	r := c.awaitReply
+	c.awaitReply = make(map[uint32]AwaitReply)
 	c.replyM.Unlock()
-	for _, ch := range ch {
-		ch <- err
+	for _, r := range r {
+		r.reply <- err
 	}
 }
 
