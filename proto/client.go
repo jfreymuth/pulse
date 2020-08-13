@@ -21,8 +21,7 @@ type Client struct {
 
 	send chan send
 
-	Callback           func(interface{})
-	OnConnectionClosed func()
+	Callback func(interface{})
 }
 
 type send struct {
@@ -207,8 +206,8 @@ func (c *Client) error(err error) {
 	for _, r := range r {
 		r.reply <- err
 	}
-	if errors.Is(err, io.EOF) && (c.OnConnectionClosed != nil) {
-		c.OnConnectionClosed()
+	if errors.Is(err, io.EOF) {
+		c.Callback(&ConnectionClosed{})
 	}
 }
 
@@ -258,3 +257,5 @@ type DataPacket struct {
 	StreamIndex uint32
 	Data        []byte
 }
+
+type ConnectionClosed struct{}
