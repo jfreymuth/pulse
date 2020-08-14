@@ -5,10 +5,11 @@ import "github.com/jfreymuth/pulse/proto"
 // A RecordStream is used for recording audio.
 // When creating a stream, the user must provide a callback that will be called with the recorded audio data.
 type RecordStream struct {
-	c       *Client
-	index   uint32
-	running bool
-	err     error
+	c *Client
+
+	index uint32
+	state streamState
+	err   error
 
 	w Writer
 
@@ -74,35 +75,42 @@ func (r *RecordStream) write(buf []byte) {
 
 // Start starts recording audio.
 func (r *RecordStream) Start() {
-	r.err = nil
-	r.c.c.Request(&proto.FlushRecordStream{StreamIndex: r.index}, nil)
-	r.c.c.Request(&proto.CorkRecordStream{StreamIndex: r.index, Corked: false}, nil)
-	r.running = true
+	if r.state == idle {
+		r.err = nil
+		r.c.c.Request(&proto.FlushRecordStream{StreamIndex: r.index}, nil)
+		r.c.c.Request(&proto.CorkRecordStream{StreamIndex: r.index, Corked: false}, nil)
+		r.state = running
+	}
 }
 
 // Stop stops recording audio; the callback will no longer be called.
 func (r *RecordStream) Stop() {
-	r.c.c.Request(&proto.CorkRecordStream{StreamIndex: r.index, Corked: true}, nil)
+	if r.state == running {
+		r.c.c.Request(&proto.CorkRecordStream{StreamIndex: r.index, Corked: true}, nil)
+		r.state = idle
+	}
 }
 
 // Close closes the stream.
-// Calling methods on a closed stream may panic.
 func (r *RecordStream) Close() {
-	r.c.c.Request(&proto.DeleteRecordStream{StreamIndex: r.index}, nil)
-	r.running = false
-	r.c = nil
+	if !r.Closed() {
+		r.c.c.Request(&proto.DeleteRecordStream{StreamIndex: r.index}, nil)
+		r.state = closed
+		r.c.mu.Lock()
+		delete(r.c.record, r.index)
+		r.c.mu.Unlock()
+	}
 }
 
 // Closed returns wether the stream was closed.
 // Calling other methods on a closed stream may panic.
-func (r *RecordStream) Closed() bool {
-	return r.c == nil
-}
+func (r *RecordStream) Closed() bool { return r.state == closed || r.state == serverLost }
 
 // Running returns wether the stream is currently recording.
-func (r *RecordStream) Running() bool {
-	return r.running
-}
+func (r *RecordStream) Running() bool { return r.state == running }
+
+// Error returns the last error returned by the stream's writer.
+func (r *RecordStream) Error() error { return r.err }
 
 // SampleRate returns the stream's sample rate (samples per second).
 func (r *RecordStream) SampleRate() int {
@@ -118,11 +126,6 @@ func (r *RecordStream) Channels() int {
 // This should only be used together with (*Cient).RawRequest.
 func (r *RecordStream) StreamIndex() uint32 {
 	return r.index
-}
-
-// Error returns the last error returned by the stream's writer.
-func (r *RecordStream) Error() error {
-	return r.err
 }
 
 // A RecordOption supplies configuration when creating streams.

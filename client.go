@@ -73,7 +73,7 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 			c.mu.Lock()
 			stream, ok := c.playback[msg.StreamIndex]
 			c.mu.Unlock()
-			if ok && stream.running {
+			if ok && stream.state == running {
 				stream.started <- true
 			}
 		case *proto.Underflow:
@@ -81,11 +81,25 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 			stream, ok := c.playback[msg.StreamIndex]
 			c.mu.Unlock()
 			if ok {
-				stream.running = false
-				if !stream.ended {
-					stream.underflow = true
+				if stream.state == running {
+					stream.state = underflow
 				}
 			}
+		case *proto.ConnectionClosed:
+			c.mu.Lock()
+			for _, p := range c.playback {
+				close(p.request)
+				p.err = ErrConnectionClosed
+				p.state = serverLost
+			}
+			for _, r := range c.record {
+				r.err = ErrConnectionClosed
+				r.state = serverLost
+			}
+			c.playback = make(map[uint32]*PlaybackStream)
+			c.record = make(map[uint32]*RecordStream)
+			c.mu.Unlock()
+			c.conn.Close()
 		default:
 			//fmt.Printf("%#v\n", msg)
 		}
@@ -134,3 +148,10 @@ func ClientServerString(s string) ClientOption {
 func (c *Client) RawRequest(req proto.RequestArgs, rpl proto.Reply) error {
 	return c.c.Request(req, rpl)
 }
+
+// ErrConnectionClosed is a special error value indicating that the server closed the connection.
+const ErrConnectionClosed = pulseError("pulseaudio: connection closed")
+
+type pulseError string
+
+func (e pulseError) Error() string { return string(e) }
