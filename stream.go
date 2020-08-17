@@ -6,7 +6,6 @@ const (
 	idle streamState = iota
 	running
 	paused
-	underflow
 	closed
 	serverLost
 )

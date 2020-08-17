@@ -73,7 +73,7 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 			c.mu.Lock()
 			stream, ok := c.playback[msg.StreamIndex]
 			c.mu.Unlock()
-			if ok && stream.state == running {
+			if ok && stream.state == running && !stream.underflow {
 				stream.started <- true
 			}
 		case *proto.Underflow:
@@ -82,7 +82,7 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 			c.mu.Unlock()
 			if ok {
 				if stream.state == running {
-					stream.state = underflow
+					stream.underflow = true
 				}
 			}
 		case *proto.ConnectionClosed:
