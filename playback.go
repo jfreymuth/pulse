@@ -272,20 +272,6 @@ func PlaybackSink(sink *Sink) PlaybackOption {
 	}
 }
 
-// PlaybackLowLatency sets the latency to the lowest safe value, as recommended by the pulseaudio server.
-//
-// This should be set after sample rate and channel options.
-//
-// Buffer size and latency should not be set at the same time.
-func PlaybackLowLatency(sink *Sink) PlaybackOption {
-	return func(p *PlaybackStream) {
-		p.createRequest.SinkIndex = sink.info.SinkIndex
-		p.createRequest.BufferTargetLength = uint32(uint64(sink.info.RequestedLatency)*uint64(p.createRequest.Rate)/1000000) * uint32(p.createRequest.Channels) * uint32(p.bytesPerSample)
-		p.createRequest.BufferMaxLength = 2 * p.createRequest.BufferTargetLength
-		p.createRequest.AdjustLatency = true
-	}
-}
-
 // PlaybackMediaName sets the streams media name.
 // This will e.g. be displayed by a volume control application to identity the stream.
 func PlaybackMediaName(name string) PlaybackOption {
