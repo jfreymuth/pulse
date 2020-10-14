@@ -12,14 +12,12 @@ import (
 type Reader interface {
 	io.Reader
 	Format() byte // Format should return one of the format constants defined by the proto package
-	BytesPerSample() int
 }
 
 // A Writer accepts audio data in a specific format.
 type Writer interface {
 	io.Writer
 	Format() byte // Format should return one of the format constants defined by the proto package
-	BytesPerSample() int
 }
 
 // Uint8Reader implements the Reader interface.
@@ -44,7 +42,8 @@ type Float32Reader func([]float32) (int, error)
 // NewReader creates a reader from an io.Reader and a format.
 // The format must be one of the constants defined in the proto package.
 func NewReader(r io.Reader, format byte) Reader {
-	return &reader{r, format, bytes(format)}
+	check(format)
+	return &reader{r, format}
 }
 
 // Uint8Writer implements the Writer interface.
@@ -69,78 +68,67 @@ type Float32Writer func([]float32) (int, error)
 // NewWriter creates a writer from an io.Writer and a format.
 // The format must be one of the constants defined in the proto package.
 func NewWriter(w io.Writer, format byte) Writer {
-	return &writer{w, format, bytes(format)}
+	check(format)
+	return &writer{w, format}
 }
 
 func (c Uint8Reader) Read(buf []byte) (int, error) { return c(buf) }
 func (c Uint8Reader) Format() byte                 { return proto.FormatUint8 }
-func (c Uint8Reader) BytesPerSample() int          { return 1 }
 
 func (c Int16Reader) Read(buf []byte) (int, error) {
 	n, err := c(int16Slice(buf))
 	return n * 2, err
 }
-func (c Int16Reader) Format() byte        { return formatI16 }
-func (c Int16Reader) BytesPerSample() int { return 2 }
+func (c Int16Reader) Format() byte { return formatI16 }
 
 func (c Int32Reader) Read(buf []byte) (int, error) {
 	n, err := c(int32Slice(buf))
 	return n * 4, err
 }
-func (c Int32Reader) Format() byte        { return formatI32 }
-func (c Int32Reader) BytesPerSample() int { return 4 }
+func (c Int32Reader) Format() byte { return formatI32 }
 
 func (c Float32Reader) Read(buf []byte) (int, error) {
 	n, err := c(float32Slice(buf))
 	return n * 4, err
 }
-func (c Float32Reader) Format() byte        { return formatF32 }
-func (c Float32Reader) BytesPerSample() int { return 4 }
+func (c Float32Reader) Format() byte { return formatF32 }
 
 func (c Uint8Writer) Write(buf []byte) (int, error) { return c(buf) }
 func (c Uint8Writer) Format() byte                  { return proto.FormatUint8 }
-func (c Uint8Writer) BytesPerSample() int           { return 1 }
 
 func (c Int16Writer) Write(buf []byte) (int, error) {
 	n, err := c(int16Slice(buf))
 	return n * 2, err
 }
-func (c Int16Writer) Format() byte        { return formatI16 }
-func (c Int16Writer) BytesPerSample() int { return 2 }
+func (c Int16Writer) Format() byte { return formatI16 }
 
 func (c Int32Writer) Write(buf []byte) (int, error) {
 	n, err := c(int32Slice(buf))
 	return n * 4, err
 }
-func (c Int32Writer) Format() byte        { return formatI32 }
-func (c Int32Writer) BytesPerSample() int { return 4 }
+func (c Int32Writer) Format() byte { return formatI32 }
 
 func (c Float32Writer) Write(buf []byte) (int, error) {
 	n, err := c(float32Slice(buf))
 	return n * 4, err
 }
-func (c Float32Writer) Format() byte        { return formatF32 }
-func (c Float32Writer) BytesPerSample() int { return 4 }
+func (c Float32Writer) Format() byte { return formatF32 }
 
 type reader struct {
 	r io.Reader
 	f byte
-	b int
 }
 
 func (r *reader) Read(buf []byte) (int, error) { return r.r.Read(buf) }
 func (r *reader) Format() byte                 { return r.f }
-func (r *reader) BytesPerSample() int          { return r.b }
 
 type writer struct {
 	w io.Writer
 	f byte
-	b int
 }
 
 func (w *writer) Write(buf []byte) (int, error) { return w.w.Write(buf) }
 func (w *writer) Format() byte                  { return w.f }
-func (w *writer) BytesPerSample() int           { return w.b }
 
 func bytes(f byte) int {
 	switch f {
@@ -150,6 +138,15 @@ func bytes(f byte) int {
 		return 2
 	case proto.FormatInt32LE, proto.FormatInt32BE, proto.FormatFloat32LE, proto.FormatFloat32BE:
 		return 4
+	}
+	panic("pulse: invalid format")
+}
+
+func check(f byte) {
+	switch f {
+	case proto.FormatUint8, proto.FormatInt16LE, proto.FormatInt16BE,
+		proto.FormatInt32LE, proto.FormatInt32BE, proto.FormatFloat32LE, proto.FormatFloat32BE:
+		return
 	}
 	panic("pulse: invalid format")
 }

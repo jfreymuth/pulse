@@ -46,7 +46,7 @@ func (c *Client) NewPlayback(r Reader, opts ...PlaybackOption) (*PlaybackStream,
 			BufferMinimumRequest:  proto.Undefined,
 			Properties:            proto.PropList{},
 		},
-		bytesPerSample: r.BytesPerSample(),
+		bytesPerSample: bytes(r.Format()),
 		r:              r,
 	}
 

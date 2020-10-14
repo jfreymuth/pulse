@@ -35,7 +35,7 @@ func (c *Client) NewRecord(w Writer, opts ...RecordOption) (*RecordStream, error
 			DirectOnInputIndex: proto.Undefined,
 			Properties:         proto.PropList{},
 		},
-		bytesPerSample: w.BytesPerSample(),
+		bytesPerSample: bytes(w.Format()),
 		w:              w,
 	}
 
