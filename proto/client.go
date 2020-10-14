@@ -15,11 +15,10 @@ type Client struct {
 	v Version
 
 	replyM     sync.Mutex
-	nextID     uint32
-	awaitReply map[uint32]AwaitReply
-	err        error
-
-	send chan send
+	writeM     sync.Mutex
+	nextID     uint32                // protected by replyM
+	awaitReply map[uint32]AwaitReply // protected by replyM
+	err        error                 // protected by replyM and writeM (hold one to read, hold both to write)
 
 	Callback func(interface{})
 }
@@ -44,10 +43,8 @@ func (c *Client) Open(rw io.ReadWriter) {
 	c.w.w = rw
 	c.v = Version(32)
 
-	c.send = make(chan send)
 	c.awaitReply = make(map[uint32]AwaitReply)
 	go c.readLoop()
-	go c.writeLoop()
 }
 
 type AwaitReply struct {
@@ -80,24 +77,28 @@ func (c *Client) Request(req RequestArgs, rpl Reply) error {
 	w.value(req, c.v)
 	w.flush()
 
-	c.send <- send{0xFFFFFFFF, buf.Bytes()}
+	err := c.Send(0xFFFFFFFF, buf.Bytes())
+	if err != nil {
+		return err
+	}
 
 	return <-reply
 }
 
-func (c *Client) Send(index uint32, data []byte) {
-	c.send <- send{index, data}
-}
-
-func (c *Client) writeLoop() {
-	for s := range c.send {
-		c.w.uint32(uint32(len(s.data)))
-		c.w.uint32(s.index)
-		c.w.uint64(0)
-		c.w.uint32(0)
-		c.w.flush()
-		c.w.w.Write(s.data)
+func (c *Client) Send(index uint32, data []byte) error {
+	c.writeM.Lock()
+	if c.err != nil {
+		c.writeM.Unlock()
+		return c.err
 	}
+	c.w.uint32(uint32(len(data)))
+	c.w.uint32(index)
+	c.w.uint64(0)
+	c.w.uint32(0)
+	c.w.flush()
+	c.w.w.Write(data)
+	c.writeM.Unlock()
+	return nil
 }
 
 func (c *Client) readLoop() {
@@ -199,14 +200,15 @@ func (c *Client) readLoop() {
 
 func (c *Client) error(err error) {
 	c.replyM.Lock()
+	c.writeM.Lock()
 	c.err = err
+	c.writeM.Unlock()
 	r := c.awaitReply
 	c.awaitReply = make(map[uint32]AwaitReply)
 	c.replyM.Unlock()
 	for _, r := range r {
 		r.reply <- err
 	}
-	close(c.send)
 	if errors.Is(err, io.EOF) {
 		c.Callback(&ConnectionClosed{})
 	}
