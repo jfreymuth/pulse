@@ -17,16 +17,13 @@ import (
 // https://www.freedesktop.org/wiki/Software/PulseAudio/Documentation/User/ServerStrings/
 // If the server string is empty, the environment variable PULSE_SERVER will be used.
 func Connect(server string) (*Client, net.Conn, error) {
-	sstr := []serverString{
-		{
-			protocol: "unix",
-			addr:     addr(),
-		},
-	}
+	var sstr []serverString
 	if server != "" {
 		sstr = parseServerString(server)
 	} else if serverRaw, ok := os.LookupEnv("PULSE_SERVER"); ok {
 		sstr = parseServerString(serverRaw)
+	} else {
+		sstr = defaultServerStrings()
 	}
 	if len(sstr) == 0 {
 		return nil, nil, errors.New("pulseaudio: no valid server")
@@ -129,23 +126,26 @@ func parseServerString(str string) []serverString {
 	return result
 }
 
-func addr() (addr string) {
+func defaultServerStrings() []serverString {
 	switch runtime.GOOS {
 	case "linux":
-		addr = fmt.Sprint("/run/user/", os.Getuid(), "/pulse/native")
+		return []serverString{{protocol: "unix",
+			addr: fmt.Sprint("/run/user/", os.Getuid(), "/pulse/native"),
+		}}
 	case "darwin":
 		u, err := user.Current()
 		if err != nil {
-			return
+			return nil
 		}
 
 		h, err := os.Hostname()
 		if err != nil {
-			return
+			return nil
 		}
 
-		addr = fmt.Sprintf("%s/.config/pulse/%s-runtime/native", u.HomeDir, h)
+		return []serverString{{protocol: "unix",
+			addr: fmt.Sprintf("%s/.config/pulse/%s-runtime/native", u.HomeDir, h),
+		}}
 	}
-
-	return
+	return nil
 }
