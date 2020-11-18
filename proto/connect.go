@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"os/user"
+	"runtime"
 	"strings"
 )
 
@@ -18,7 +20,7 @@ func Connect(server string) (*Client, net.Conn, error) {
 	sstr := []serverString{
 		{
 			protocol: "unix",
-			addr:     fmt.Sprint("/run/user/", os.Getuid(), "/pulse/native"),
+			addr:     addr(),
 		},
 	}
 	if server != "" {
@@ -125,4 +127,25 @@ func parseServerString(str string) []serverString {
 		result = append(result, server)
 	}
 	return result
+}
+
+func addr() (addr string) {
+	switch runtime.GOOS {
+	case "linux":
+		addr = fmt.Sprint("/run/user/", os.Getuid(), "/pulse/native")
+	case "darwin":
+		u, err := user.Current()
+		if err != nil {
+			return
+		}
+
+		h, err := os.Hostname()
+		if err != nil {
+			return
+		}
+
+		addr = fmt.Sprintf("%s/.config/pulse/%s-runtime/native", u.HomeDir, h)
+	}
+
+	return
 }
