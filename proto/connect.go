@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"os/user"
+	"path"
 	"runtime"
 	"strings"
 )
@@ -130,7 +131,7 @@ func defaultServerStrings() []serverString {
 	switch runtime.GOOS {
 	case "linux":
 		return []serverString{{protocol: "unix",
-			addr: fmt.Sprint("/run/user/", os.Getuid(), "/pulse/native"),
+			addr: path.Join(os.Getenv("XDG_RUNTIME_DIR"), "pulse/native"),
 		}}
 	case "darwin":
 		u, err := user.Current()
