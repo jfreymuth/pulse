@@ -206,6 +206,10 @@ func (p *PlaybackStream) StreamIndex() uint32 {
 	return p.index
 }
 
+func (p *PlaybackStream) StreamInputIndex() uint32 {
+	return p.createReply.SinkInputIndex
+}
+
 // A PlaybackOption supplies configuration when creating streams.
 type PlaybackOption func(*PlaybackStream)
 
