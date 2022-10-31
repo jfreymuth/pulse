@@ -582,7 +582,7 @@ type GetSinkInputInfoListReply []*GetSinkInputInfoReply
 type GetSourceOutputInfoListReply []*GetSourceOutputInfoReply
 type GetSampleInfoListReply []*GetSampleInfoReply
 
-type Subscribe struct{ Mask uint32 }
+type Subscribe struct{ Mask SubscriptionMask }
 
 type SetSinkVolume struct {
 	SinkIndex      uint32
@@ -929,7 +929,7 @@ type PlaybackStreamKilled struct{ StreamIndex uint32 }
 type RecordStreamKilled struct{ StreamIndex uint32 }
 
 type SubscribeEvent struct {
-	Event uint32
+	Event SubscriptionEventType
 	Index uint32
 }
 
