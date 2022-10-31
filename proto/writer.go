@@ -136,6 +136,9 @@ func (p *ProtocolWriter) value(i interface{}, version Version) {
 		case Version:
 			p.byte('L')
 			p.uint32(uint32(f))
+		case SubscriptionMask:
+			p.byte('L')
+			p.uint32(uint32(f))
 		case byte:
 			p.byte('B')
 			p.byte(f)

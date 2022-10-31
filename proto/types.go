@@ -67,6 +67,93 @@ type FormatInfo struct {
 	Properties PropList
 }
 
+type SubscriptionMask uint32
+
+const (
+	SubscriptionMaskSink SubscriptionMask = 1 << iota
+	SubscriptionMaskSource
+	SubscriptionMaskSinkInput
+	SubscriptionMaskSourceInput
+	SubscriptionMaskModule
+	SubscriptionMaskClient
+	SubscriptionMaskSampleCache
+	SubscriptionMaskServer
+	SubscriptionMaskAutoload
+	SubscriptionMaskCard
+
+	SubscriptionMaskNull SubscriptionMask = 0
+	SubscriptionMaskAll  SubscriptionMask = 0x02ff
+)
+
+type SubscriptionEventType uint32
+
+const (
+	EventSink SubscriptionEventType = iota
+	EventSource
+	EventSinkSinkInput
+	EventSinkSourceOutput
+	EventModule
+	EventClient
+	EventSampleCache
+	EventServer
+	EventAutoload
+	EventCard
+	EventFacilityMask SubscriptionEventType = 0xf
+
+	EventNew      SubscriptionEventType = 0x0000
+	EventChange   SubscriptionEventType = 0x0010
+	EventRemove   SubscriptionEventType = 0x0020
+	EventTypeMask SubscriptionEventType = 0x0030
+)
+
+func (e SubscriptionEventType) GetFacility() SubscriptionEventType {
+	return e & EventFacilityMask
+}
+
+func (e SubscriptionEventType) GetType() SubscriptionEventType {
+	return e & EventTypeMask
+}
+
+func (e SubscriptionEventType) String() string {
+	var res string
+	switch e.GetType() {
+	case EventNew:
+		res += "new"
+	case EventChange:
+		res += "change"
+	case EventRemove:
+		res += "remove"
+	default:
+		return "<invalid type>"
+	}
+	res += " "
+	switch e.GetFacility() {
+	case EventSink:
+		res += "sink"
+	case EventSource:
+		res += "source"
+	case EventSinkSinkInput:
+		res += "sink input"
+	case EventSinkSourceOutput:
+		res += "source output"
+	case EventModule:
+		res += "module"
+	case EventClient:
+		res += "client"
+	case EventSampleCache:
+		res += "sample cache"
+	case EventServer:
+		res += "server"
+	case EventAutoload:
+		res += "autoload"
+	case EventCard:
+		res += "card"
+	default:
+		return "<invalid facility>"
+	}
+	return res
+}
+
 type PropList map[string]PropListEntry
 
 type PropListEntry []byte
