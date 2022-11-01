@@ -56,7 +56,7 @@ func main() {
 			acc += int64(vol)
 		}
 		acc /= int64(len(repl.ChannelVolumes))
-		pct := float64(acc) / float64(repl.BaseVolume) * 100.0
+		pct := float64(acc) / float64(proto.VolumeNorm) * 100.0
 		log.Printf("%s volume: %.0f%%", *sinkName, pct)
 	}
 }
