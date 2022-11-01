@@ -1,5 +1,7 @@
 package proto
 
+import "math"
+
 const Undefined = 0xFFFFFFFF
 
 const (
@@ -61,6 +63,17 @@ type Time struct {
 }
 
 type Volume uint32
+
+const (
+	// Muted (minimal valid) volume (0%, -inf dB)
+	VolumeMuted Volume = 0
+	// Normal volume (100%, 0 dB)
+	VolumeNorm Volume = 0x10000
+	// Maximum valid volume we can store.
+	VolumeMax Volume = math.MaxUint32 / 2
+	// Special 'invalid' volume.
+	VolumeInvalid Volume = math.MaxUint32
+)
 
 type FormatInfo struct {
 	Encoding   byte
