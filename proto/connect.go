@@ -10,6 +10,7 @@ import (
 	"path"
 	"runtime"
 	"strings"
+	"time"
 )
 
 // Connect connects to the pulse server.
@@ -29,7 +30,9 @@ func Connect(server string) (*Client, net.Conn, error) {
 	if len(sstr) == 0 {
 		return nil, nil, errors.New("pulseaudio: no valid server")
 	}
-	c := &Client{}
+	c := &Client{
+		timeout: 1 * time.Second,
+	}
 
 	localname, err := os.Hostname()
 	if err != nil {

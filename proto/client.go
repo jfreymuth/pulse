@@ -2,11 +2,13 @@ package proto
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"reflect"
 	"sync"
+	"time"
 )
 
 type Client struct {
@@ -18,7 +20,8 @@ type Client struct {
 	writeM     sync.Mutex
 	nextID     uint32                // protected by replyM
 	awaitReply map[uint32]AwaitReply // protected by replyM
-	err        error                 // protected by replyM and writeM (hold one to read, hold both to write)
+	timeout    time.Duration
+	err        error // protected by replyM and writeM (hold one to read, hold both to write)
 
 	Callback func(interface{})
 }
@@ -34,6 +37,10 @@ func (c *Client) Version() Version {
 
 func (c *Client) SetVersion(v Version) {
 	c.v = c.v.Min(v)
+}
+
+func (c *Client) SetTimeout(t time.Duration) {
+	c.timeout = t
 }
 
 func (c *Client) Open(rw io.ReadWriter) {
@@ -56,6 +63,9 @@ func (c *Client) Request(req RequestArgs, rpl Reply) error {
 	if rpl != nil && req.command() != rpl.IsReplyTo() {
 		panic("pulse: wrong reply type")
 	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
+	defer cancel()
 
 	reply := make(chan error, 1)
 	c.replyM.Lock()
@@ -82,7 +92,13 @@ func (c *Client) Request(req RequestArgs, rpl Reply) error {
 		return err
 	}
 
-	return <-reply
+	select {
+	case err := <-reply:
+		return err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
 }
 
 func (c *Client) Send(index uint32, data []byte) error {
