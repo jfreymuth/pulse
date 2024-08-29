@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 	"sync"
+	"time"
 
 	"github.com/jfreymuth/pulse/proto"
 )
@@ -19,8 +20,9 @@ type Client struct {
 	playback map[uint32]*PlaybackStream
 	record   map[uint32]*RecordStream
 
-	server string
-	props  proto.PropList
+	server  string
+	props   proto.PropList
+	timeout time.Duration
 }
 
 // NewClient connects to the server.
@@ -43,6 +45,10 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 	c.c, c.conn, err = proto.Connect(c.server)
 	if err != nil {
 		return nil, err
+	}
+
+	if c.timeout != 0 {
+		c.c.SetTimeout(c.timeout)
 	}
 
 	err = c.c.Request(&proto.SetClientName{Props: c.props}, &proto.SetClientNameReply{})
@@ -134,6 +140,14 @@ func ClientApplicationIconName(name string) ClientOption {
 // https://www.freedesktop.org/wiki/Software/PulseAudio/Documentation/User/ServerStrings/
 func ClientServerString(s string) ClientOption {
 	return func(c *Client) { c.server = s }
+}
+
+// ClientTimeout sets the timeout of requests to the specified duration.
+// If d is 0, the default value (1 s) will be used.
+func ClientTimeout(d time.Duration) ClientOption {
+	return func(c *Client) {
+		c.timeout = d
+	}
 }
 
 // RawRequest can be used to send arbitrary requests.
