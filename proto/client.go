@@ -232,7 +232,7 @@ func (c *Client) error(err error) {
 
 func (c *Client) parseInfoList(value interface{}, length int) {
 	start := c.r.pos
-	for c.r.pos-start < length {
+	for c.r.err == nil && c.r.pos-start < length {
 		switch value := value.(type) {
 		case *GetSinkInfoListReply:
 			var v GetSinkInfoReply

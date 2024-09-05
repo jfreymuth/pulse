@@ -179,6 +179,10 @@ func (p *ProtocolReader) value(i interface{}, version Version) {
 	v := reflect.ValueOf(i).Elem()
 	t := v.Type()
 	for i := 0; i < v.NumField(); i++ {
+		if p.err != nil {
+			return
+		}
+
 		f := v.Field(i)
 
 		if tag := string(t.Field(i).Tag); tag != "" {
