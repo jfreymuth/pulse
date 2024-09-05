@@ -1,17 +1,20 @@
 package proto
 
 import (
+	"bufio"
+	"bytes"
+	"encoding/binary"
 	"io"
 	"reflect"
 	"strconv"
 )
 
 type ProtocolReader struct {
-	r        io.Reader
-	buf      []byte
-	buffered int
-	err      error
-	pos      int
+	r      *bufio.Reader
+	err    error
+	pos    int
+	intBuf [8]byte
+	buf    bytes.Buffer
 }
 
 func (p *ProtocolReader) setErr(err error) {
@@ -20,76 +23,39 @@ func (p *ProtocolReader) setErr(err error) {
 	}
 }
 
-func (p *ProtocolReader) fill(min int) {
-	const bufferSize = 1024
-	if p.err != nil {
-		return
-	}
-	if len(p.buf) < min {
-		size := 2 * min
-		if size < bufferSize {
-			size = bufferSize
-		}
-		buf := make([]byte, size)
-		copy(buf, p.buf[:p.buffered])
-		p.buf = buf
-	}
-	emptyReads := 0
-	for p.buffered < min {
-		n, err := p.r.Read(p.buf[p.buffered:])
-		p.buffered += n
-		if err != nil {
-			p.err = err
-			return
-		}
-		if n == 0 {
-			emptyReads++
-			if emptyReads >= 100 {
-				p.err = io.ErrNoProgress
-				return
-			}
-		}
-	}
-}
-
 func (p *ProtocolReader) advance(n int) {
-	p.fill(n)
-	if p.err != nil {
-		return
-	}
-	p.buf = p.buf[n:]
-	p.buffered -= n
+	p.tmpbytes(n)
 	p.pos += n
 }
 
 func (p *ProtocolReader) byte() byte {
-	p.fill(1)
-	if p.err != nil {
+	_, err := io.ReadFull(p.r, p.intBuf[:1])
+	if err != nil {
+		p.err = err
 		return 0
 	}
-	b := p.buf[0]
-	p.advance(1)
-	return b
+	p.pos += 1
+	return p.intBuf[0]
 }
 
 func (p *ProtocolReader) uint32() uint32 {
-	p.fill(4)
-	if p.err != nil {
+	_, err := io.ReadFull(p.r, p.intBuf[:4])
+	if err != nil {
+		p.err = err
 		return 0
 	}
-	u := uint32(p.buf[0])<<24 | uint32(p.buf[1])<<16 | uint32(p.buf[2])<<8 | uint32(p.buf[3])
-	p.advance(4)
-	return u
+	p.pos += 4
+	return binary.BigEndian.Uint32(p.intBuf[:4])
 }
 
 func (p *ProtocolReader) uint64() uint64 {
-	p.fill(8)
-	if p.err != nil {
+	_, err := io.ReadFull(p.r, p.intBuf[:8])
+	if err != nil {
+		p.err = err
 		return 0
 	}
-	u := uint64(p.buf[0])<<56 | uint64(p.buf[1])<<48 | uint64(p.buf[2])<<40 | uint64(p.buf[3])<<32 | uint64(p.buf[4])<<24 | uint64(p.buf[5])<<16 | uint64(p.buf[6])<<8 | uint64(p.buf[7])
-	p.advance(8)
-	return u
+	p.pos += 8
+	return binary.BigEndian.Uint64(p.intBuf[:8])
 }
 
 func (p *ProtocolReader) bool() bool {
@@ -98,49 +64,69 @@ func (p *ProtocolReader) bool() bool {
 
 func (p *ProtocolReader) string() string {
 	const maxLength = 1024
-	for i := 0; i < maxLength; i++ {
-		if i >= p.buffered {
-			p.fill(p.buffered + 1)
+
+	p.buf.Reset()
+
+	// Modified from bufio.Reader.ReadBytes to use our own buffer
+	// without allocating
+	// Use ReadSlice to look for delim, accumulating full buffers.
+	for {
+		frag, err := p.r.ReadSlice(0)
+		if err == nil { // got final fragment
+			p.buf.Write(frag)
+			break
 		}
-		if p.err != nil {
+
+		if err != bufio.ErrBufferFull { // unexpected error
+			p.err = err
 			return ""
 		}
-		if p.buf[i] == 0 {
-			s := string(p.buf[:i])
-			p.advance(i + 1)
-			return s
+
+		p.buf.Write(frag)
+
+		if p.buf.Len() > 1024 {
+			p.setErr(ErrProtocolError)
+			return ""
 		}
 	}
-	p.setErr(ErrProtocolError)
-	return ""
+
+	if p.buf.Len() == 0 {
+		return ""
+	}
+
+	p.pos += p.buf.Len()
+
+	return string(p.buf.Bytes()[:p.buf.Len()-1])
 }
 
 func (p *ProtocolReader) bytes(out []byte) {
-	p.fill(len(out))
-	if p.err != nil {
+	_, err := io.ReadFull(p.r, out)
+	if err != nil {
+		p.err = err
 		return
 	}
-	copy(out, p.buf)
-	p.advance(len(out))
+
+	p.pos += len(out)
 }
 
 func (p *ProtocolReader) tmpbytes(n int) []byte {
-	p.fill(n)
-	if p.err != nil {
+	p.buf.Reset()
+
+	_, err := io.CopyN(&p.buf, p.r, int64(n))
+	if err != nil {
+		p.err = err
 		return nil
 	}
-	return p.buf[:n]
+	return p.buf.Bytes()
 }
 
 func (p *ProtocolReader) x() []byte {
 	l := p.uint32()
 	x := make([]byte, l)
-	p.fill(int(l))
+	p.bytes(x)
 	if p.err != nil {
 		return nil
 	}
-	copy(x, p.buf)
-	p.advance(int(l))
 	return x
 }
 

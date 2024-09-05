@@ -1,6 +1,7 @@
 package proto
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -46,7 +47,7 @@ func (c *Client) SetTimeout(t time.Duration) {
 func (c *Client) Open(rw io.ReadWriter) {
 	//debug, _ := os.Create("debug")
 	//c.r.r = io.TeeReader(rw, debug)
-	c.r.r = rw
+	c.r.r = bufio.NewReader(rw)
 	c.w.w = rw
 	c.v = Version(32)
 
@@ -205,11 +206,11 @@ func (c *Client) readLoop() {
 				}
 			}
 		} else {
+			buf := c.r.tmpbytes(int(length))
 			if c.Callback != nil {
-				buf := c.r.tmpbytes(int(length))
 				c.Callback(&DataPacket{index, buf})
 			}
-			c.r.advance(int(length))
+			c.r.pos += int(length)
 		}
 	}
 }
