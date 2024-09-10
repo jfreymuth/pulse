@@ -84,7 +84,7 @@ func (p *ProtocolReader) string() string {
 
 		p.buf.Write(frag)
 
-		if p.buf.Len() > 1024 {
+		if p.buf.Len() > maxLength {
 			p.setErr(ErrProtocolError)
 			return ""
 		}
