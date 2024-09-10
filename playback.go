@@ -153,6 +153,39 @@ func (p *PlaybackStream) Drain() {
 	}
 }
 
+// Volume returns the volume of each channel in the playback.
+func (p *PlaybackStream) Volume() (proto.ChannelVolumes, error) {
+	reply := proto.GetSinkInputInfoReply{}
+	err := p.c.c.Request(&proto.GetSinkInputInfo{
+		SinkInputIndex: p.createReply.SinkInputIndex,
+	}, &reply)
+	if err != nil {
+		return nil, err
+	}
+	return reply.ChannelVolumes, nil
+}
+
+// SetVolume changes the volume of each channel in the playback.
+//
+// Do not set the volume when opening a playback stream, PulseAudio will pick an
+// appropriate volume for the stream automatically (and may save it for next
+// time). In particular, don't set it to 100% because depending on the
+// configuration this could actually set the volume to the maximum volume the
+// hardware is capable of which is usually way too loud. Instead, only change
+// the volume as a direct result of user input.
+//
+// If you use this API, you should also query the volume on startup and listen
+// for playback volume changes from the system mixer (many desktops allow users
+// to change application volume from the system tray). That way, you can keep
+// the volume slider in the application synchronized with the system volume
+// mixer.
+func (p *PlaybackStream) SetVolume(volumes proto.ChannelVolumes) error {
+	return p.c.c.Request(&proto.SetSinkInputVolume{
+		SinkInputIndex: p.createReply.SinkInputIndex,
+		ChannelVolumes: volumes,
+	}, nil)
+}
+
 // Close closes the stream.
 func (p *PlaybackStream) Close() {
 	if !p.Closed() {

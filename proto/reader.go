@@ -252,9 +252,9 @@ func (p *ProtocolReader) value(i interface{}, version Version) {
 			p.bytes(b)
 			f.SetBytes(b)
 		case 'v':
-			u := make([]uint32, p.byte())
+			u := make(ChannelVolumes, p.byte())
 			for i := range u {
-				u[i] = p.uint32()
+				u[i] = Volume(p.uint32())
 			}
 			f.Set(reflect.ValueOf(u))
 		case 'P':

@@ -179,7 +179,7 @@ func (p *ProtocolWriter) value(i interface{}, version Version) {
 			p.byte('v')
 			p.byte(byte(len(f)))
 			for i := range f {
-				p.uint32(f[i])
+				p.uint32(uint32(f[i]))
 			}
 		case PropList:
 			p.byte('P')

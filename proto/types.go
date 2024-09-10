@@ -55,7 +55,17 @@ type Microseconds uint64
 
 type ChannelMap []byte
 
-type ChannelVolumes []uint32
+type ChannelVolumes []Volume
+
+// Avg returns the average volume of all the channels.
+func (cv ChannelVolumes) Avg() Volume {
+	// This matches pa_cvolume_avg.
+	avg := uint64(0)
+	for _, vol := range cv {
+		avg += uint64(vol)
+	}
+	return Volume(avg / uint64(len(cv)))
+}
 
 type Time struct {
 	Seconds      uint32
@@ -74,6 +84,41 @@ const (
 	// Special 'invalid' volume.
 	VolumeInvalid Volume = math.MaxUint32
 )
+
+// Convert a linear volume (of a volume slider for example) to a volume. The
+// input volume must have a range from 0.0 to 1.0, values outside this range
+// will be clamped.
+func LinearVolume(v float64) Volume {
+	// This is the formula as pa_sw_volume_from_linear in PulseAudio.
+
+	rawVolume := int64(math.Round(math.Cbrt(v) * float64(VolumeNorm)))
+	if rawVolume < int64(VolumeMuted) {
+		rawVolume = 0
+	} else if rawVolume > int64(VolumeMax) {
+		rawVolume = int64(VolumeMax)
+	}
+	return Volume(rawVolume)
+}
+
+// Return the linear volume, from 0% to 100% as a value from 0.0..1.0.
+func (v Volume) Linear() float64 {
+	// This is the same formula as pa_sw_volume_to_linear in PulseAudio.
+
+	if v > VolumeMax {
+		return 0
+	}
+
+	if v <= VolumeMuted {
+		return 0.0
+	}
+
+	if v == VolumeNorm {
+		return 1.0
+	}
+
+	f := (float64(v) / float64(VolumeNorm))
+	return f * f * f
+}
 
 type FormatInfo struct {
 	Encoding   byte
