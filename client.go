@@ -57,6 +57,13 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 		return nil, err
 	}
 
+	// Listen for changes to the sink input, which includes changes in volume.
+	err = c.c.Request(&proto.Subscribe{Mask: proto.SubscriptionMaskSinkInput}, nil)
+	if err != nil {
+		c.conn.Close()
+		return nil, err
+	}
+
 	c.playback = make(map[uint32]*PlaybackStream)
 	c.record = make(map[uint32]*RecordStream)
 	c.c.Callback = func(msg interface{}) {
@@ -106,6 +113,33 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 			c.record = make(map[uint32]*RecordStream)
 			c.mu.Unlock()
 			c.conn.Close()
+		case *proto.SubscribeEvent:
+			if msg.Event&proto.EventFacilityMask == proto.EventSinkSinkInput {
+				// Something about the sink input changed, but we don't know
+				// what exactly. Signal this to the playback stream.
+				var stream *PlaybackStream
+				c.mu.Lock()
+				for _, v := range c.playback {
+					if msg.Index == v.createReply.SinkInputIndex {
+						stream = v
+					}
+				}
+				c.mu.Unlock()
+				if stream != nil {
+					stream.eventsLock.Lock()
+					if stream.events != nil {
+						// Do a non-blocking send.
+						// Because subscribeEvent is a buffered channel and
+						// because the channel has no contents (just signals),
+						// no message will be lost due to races.
+						select {
+						case stream.events <- struct{}{}:
+						default:
+						}
+					}
+					stream.eventsLock.Unlock()
+				}
+			}
 		default:
 			//fmt.Printf("%#v\n", msg)
 		}

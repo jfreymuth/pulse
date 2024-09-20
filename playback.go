@@ -1,6 +1,10 @@
 package pulse
 
-import "github.com/jfreymuth/pulse/proto"
+import (
+	"sync"
+
+	"github.com/jfreymuth/pulse/proto"
+)
 
 // A PlaybackStream is used for playing audio.
 // When creating a stream, the user must provide a callback that will be used to buffer audio data.
@@ -16,6 +20,10 @@ type PlaybackStream struct {
 	requested   int
 	request     chan int
 	started     chan bool
+
+	events        chan struct{}
+	eventsLock    sync.Mutex
+	volumeChanges chan proto.ChannelVolumes
 
 	r Reader
 
@@ -62,6 +70,13 @@ func (c *Client) NewPlayback(r Reader, opts ...PlaybackOption) (*PlaybackStream,
 		p.createRequest.ChannelVolumes = cvol
 	}
 
+	// Listen for changes in the sink input if the application wants to be
+	// notified of volume changes.
+	if p.volumeChanges != nil {
+		p.events = make(chan struct{}, 1)
+		go p.handleEvents(p.events)
+	}
+
 	err := c.c.Request(&p.createRequest, &p.createReply)
 	if err != nil {
 		return nil, err
@@ -105,6 +120,68 @@ func (p *PlaybackStream) run() {
 			}
 		}
 	}
+}
+
+// Handle events for this playback stream in a goroutine.
+// Event notifications are received through the events channel.
+func (p *PlaybackStream) handleEvents(events chan struct{}) {
+	volume := make(proto.ChannelVolumes, len(p.createRequest.ChannelMap))
+
+	for range events {
+		// We got an event that something about our sink input changed, so read
+		// the sink input information.
+		reply := proto.GetSinkInputInfoReply{}
+		err := p.c.c.Request(&proto.GetSinkInputInfo{
+			SinkInputIndex: p.createReply.SinkInputIndex,
+		}, &reply)
+		if err != nil {
+			if p.Closed() {
+				// Most likely this error is caused by the stream getting
+				// closed. So exit the goroutine.
+				break
+			}
+			// This should not normally happen.
+			panic(err)
+		}
+
+		// Check whether the volume changed, and if so, report it to the
+		// application.
+		volumeChanged := false
+		for i, val := range reply.ChannelVolumes {
+			if volume[i] != val {
+				volume[i] = val
+				volumeChanged = true
+			}
+		}
+		if volumeChanged {
+			volumeToSend := append(proto.ChannelVolumes(nil), volume...) // copy volume
+
+			// Drop last volume change, if not received by the application.
+			// This way, if p.volumeChanges is a buffered channel, some updates
+			// might get lost when the receiver is slow but it will always
+			// receive the latest volume eventually.
+			select {
+			case <-p.volumeChanges:
+				// Dropped, so there was something in the buffered channel.
+			default:
+				// Not dropped, so if the channel is buffered, it should have
+				// room now.
+			}
+
+			// Send the new volume.
+			select {
+			case p.volumeChanges <- volumeToSend:
+				// Succeeded in sending!
+			default:
+				// Somehow couldn't send the new volume value. Perhaps the
+				// channel is unbuffered, and the receiving goroutine is doing
+				// other things? There's not much we can do about it here.
+			}
+		}
+	}
+
+	// Playback stream was closed, so close the volume changes channel.
+	close(p.volumeChanges)
 }
 
 // Start starts playing audio.
@@ -192,9 +269,15 @@ func (p *PlaybackStream) Close() {
 		p.c.c.Request(&proto.DeletePlaybackStream{StreamIndex: p.index}, nil)
 		p.state = closed
 		close(p.request)
+
 		p.c.mu.Lock()
 		delete(p.c.playback, p.index)
 		p.c.mu.Unlock()
+
+		p.eventsLock.Lock()
+		close(p.events)
+		p.events = nil
+		p.eventsLock.Unlock()
 	}
 }
 
@@ -322,6 +405,19 @@ func PlaybackMediaName(name string) PlaybackOption {
 func PlaybackMediaIconName(name string) PlaybackOption {
 	return func(p *PlaybackStream) {
 		p.createRequest.Properties["media.icon_name"] = proto.PropListString(name)
+	}
+}
+
+// PlaybackVolumeChanges sets a channel to receive volume changes on.
+// These changes can come either from changing the volume directly (through
+// SetVolume) or from the system volume mixer.
+//
+// The channel should be buffered (1 element is sufficient) to avoid losing
+// volume changes due to race conditions or a slow receiver. It will be closed
+// when the playback is closed.
+func PlaybackVolumeChanges(changes chan proto.ChannelVolumes) PlaybackOption {
+	return func(p *PlaybackStream) {
+		p.volumeChanges = changes
 	}
 }
 
