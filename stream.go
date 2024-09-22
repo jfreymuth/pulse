@@ -1,9 +1,7 @@
 package pulse
 
-type streamState int
-
 const (
-	idle streamState = iota
+	idle uint32 = iota
 	running
 	paused
 	closed
