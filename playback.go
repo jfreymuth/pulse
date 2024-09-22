@@ -2,6 +2,7 @@ package pulse
 
 import (
 	"sync"
+	"sync/atomic"
 
 	"github.com/jfreymuth/pulse/proto"
 )
@@ -12,7 +13,7 @@ type PlaybackStream struct {
 	c *Client
 
 	index     uint32
-	state     streamState
+	state     atomic.Uint32
 	underflow bool
 	err       error
 
@@ -95,7 +96,7 @@ func (c *Client) NewPlayback(r Reader, opts ...PlaybackOption) (*PlaybackStream,
 
 func (p *PlaybackStream) run() {
 	for n := range p.request {
-		if p.state != running {
+		if p.state.Load() != running {
 			continue
 		}
 		p.requested += n
@@ -110,7 +111,7 @@ func (p *PlaybackStream) run() {
 				if err != EndOfData {
 					p.err = err
 				}
-				p.state = idle
+				p.state.Store(idle)
 				break
 			}
 			select {
@@ -186,9 +187,8 @@ func (p *PlaybackStream) handleEvents(events chan struct{}) {
 
 // Start starts playing audio.
 func (p *PlaybackStream) Start() {
-	if p.state == idle {
+	if p.state.CompareAndSwap(idle, running) {
 		p.c.c.Request(&proto.FlushPlaybackStream{StreamIndex: p.index}, nil)
-		p.state = running
 		p.err = nil
 		p.request <- int(p.createReply.BufferTargetLength)
 		p.underflow = false
@@ -200,24 +200,22 @@ func (p *PlaybackStream) Start() {
 // Stop stops playing audio; the callback will no longer be called.
 // If the buffer size/latency is large, audio may continue to play for some time after the call to Stop.
 func (p *PlaybackStream) Stop() {
-	if p.state == running || p.state == paused {
-		p.state = idle
-	}
+	// Set to idle if running or paused.
+	p.state.CompareAndSwap(running, idle)
+	p.state.CompareAndSwap(paused, idle)
 }
 
 // Pause stops playing audio immediately.
 func (p *PlaybackStream) Pause() {
-	if p.state == running {
+	if p.state.CompareAndSwap(running, paused) {
 		p.c.c.Request(&proto.CorkPlaybackStream{StreamIndex: p.index, Corked: true}, nil)
-		p.state = paused
 	}
 }
 
 // Resume resumes a paused stream.
 func (p *PlaybackStream) Resume() {
-	if p.state == paused {
+	if p.state.CompareAndSwap(paused, running) {
 		p.c.c.Request(&proto.CorkPlaybackStream{StreamIndex: p.index, Corked: false}, nil)
-		p.state = running
 		p.underflow = false
 	}
 }
@@ -225,7 +223,7 @@ func (p *PlaybackStream) Resume() {
 // Drain waits until the playback has ended.
 // Drain does not return when the stream is paused.
 func (p *PlaybackStream) Drain() {
-	if p.state == running {
+	if p.state.Load() == running {
 		p.c.c.Request(&proto.DrainPlaybackStream{StreamIndex: p.index}, nil)
 	}
 }
@@ -267,7 +265,7 @@ func (p *PlaybackStream) SetVolume(volumes proto.ChannelVolumes) error {
 func (p *PlaybackStream) Close() {
 	if !p.Closed() {
 		p.c.c.Request(&proto.DeletePlaybackStream{StreamIndex: p.index}, nil)
-		p.state = closed
+		p.state.Store(closed)
 		close(p.request)
 
 		p.c.mu.Lock()
@@ -282,10 +280,13 @@ func (p *PlaybackStream) Close() {
 }
 
 // Closed returns wether the stream was closed.
-func (p *PlaybackStream) Closed() bool { return p.state == closed || p.state == serverLost }
+func (p *PlaybackStream) Closed() bool {
+	state := p.state.Load()
+	return state == closed || state == serverLost
+}
 
 // Running returns wether the stream is currently playing.
-func (p *PlaybackStream) Running() bool { return p.state == running }
+func (p *PlaybackStream) Running() bool { return p.state.Load() == running }
 
 // Underflow returns true if any underflows happend since the last call to Start or Resume.
 // Underflows usually happen because the latency/buffer size is too low or because the callback

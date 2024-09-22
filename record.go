@@ -1,6 +1,10 @@
 package pulse
 
-import "github.com/jfreymuth/pulse/proto"
+import (
+	"sync/atomic"
+
+	"github.com/jfreymuth/pulse/proto"
+)
 
 // A RecordStream is used for recording audio.
 // When creating a stream, the user must provide a callback that will be called with the recorded audio data.
@@ -8,7 +12,7 @@ type RecordStream struct {
 	c *Client
 
 	index uint32
-	state streamState
+	state atomic.Uint32
 	err   error
 
 	w Writer
@@ -75,19 +79,17 @@ func (r *RecordStream) write(buf []byte) {
 
 // Start starts recording audio.
 func (r *RecordStream) Start() {
-	if r.state == idle {
+	if r.state.CompareAndSwap(idle, running) {
 		r.err = nil
 		r.c.c.Request(&proto.FlushRecordStream{StreamIndex: r.index}, nil)
 		r.c.c.Request(&proto.CorkRecordStream{StreamIndex: r.index, Corked: false}, nil)
-		r.state = running
 	}
 }
 
 // Stop stops recording audio; the callback will no longer be called.
 func (r *RecordStream) Stop() {
-	if r.state == running {
+	if r.state.CompareAndSwap(running, idle) {
 		r.c.c.Request(&proto.CorkRecordStream{StreamIndex: r.index, Corked: true}, nil)
-		r.state = idle
 	}
 }
 
@@ -95,7 +97,7 @@ func (r *RecordStream) Stop() {
 func (r *RecordStream) Close() {
 	if !r.Closed() {
 		r.c.c.Request(&proto.DeleteRecordStream{StreamIndex: r.index}, nil)
-		r.state = closed
+		r.state.Store(closed)
 		r.c.mu.Lock()
 		delete(r.c.record, r.index)
 		r.c.mu.Unlock()
@@ -104,10 +106,13 @@ func (r *RecordStream) Close() {
 
 // Closed returns wether the stream was closed.
 // Calling other methods on a closed stream may panic.
-func (r *RecordStream) Closed() bool { return r.state == closed || r.state == serverLost }
+func (r *RecordStream) Closed() bool {
+	state := r.state.Load()
+	return state == closed || state == serverLost
+}
 
 // Running returns wether the stream is currently recording.
-func (r *RecordStream) Running() bool { return r.state == running }
+func (r *RecordStream) Running() bool { return r.state.Load() == running }
 
 // Error returns the last error returned by the stream's writer.
 func (r *RecordStream) Error() error { return r.err }
