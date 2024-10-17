@@ -85,13 +85,18 @@ const (
 	VolumeInvalid Volume = math.MaxUint32
 )
 
-// Convert a linear volume (of a volume slider for example) to a volume. The
-// input volume must have a range from 0.0 to 1.0, values outside this range
-// will be clamped.
+// Convert a linear volume to a Volume value. The input volume must have a range
+// from 0.0 to 1.0, values outside this range will be clamped.
 func LinearVolume(v float64) Volume {
 	// This is the formula as pa_sw_volume_from_linear in PulseAudio.
 
-	rawVolume := int64(math.Round(math.Cbrt(v) * float64(VolumeNorm)))
+	return NormVolume(math.Cbrt(v))
+}
+
+// Convert a normalized volume value (0.0..1.0 for 0%..100%) to a Volume value.
+// Volume values that are out of range will be clipped.
+func NormVolume(v float64) Volume {
+	rawVolume := int64(math.Round(v * float64(VolumeNorm)))
 	if rawVolume < int64(VolumeMuted) {
 		rawVolume = 0
 	} else if rawVolume > int64(VolumeMax) {
@@ -103,7 +108,12 @@ func LinearVolume(v float64) Volume {
 // Return the linear volume, from 0% to 100% as a value from 0.0..1.0.
 func (v Volume) Linear() float64 {
 	// This is the same formula as pa_sw_volume_to_linear in PulseAudio.
+	f := v.Norm()
+	return f * f * f
+}
 
+// Convert a Volume value back to a normalized volume, where 1.0 means 100%.
+func (v Volume) Norm() float64 {
 	if v > VolumeMax {
 		return 0
 	}
@@ -116,8 +126,7 @@ func (v Volume) Linear() float64 {
 		return 1.0
 	}
 
-	f := (float64(v) / float64(VolumeNorm))
-	return f * f * f
+	return (float64(v) / float64(VolumeNorm))
 }
 
 type FormatInfo struct {
