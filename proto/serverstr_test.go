@@ -35,6 +35,24 @@ func TestParseServerString(t *testing.T) {
 			},
 		},
 		{
+			"gurki",
+			[]serverString{
+				{"", "tcp", "gurki:4713"},
+			},
+		},
+		{
+			"127.0.0.1",
+			[]serverString{
+				{"", "tcp", "127.0.0.1:4713"},
+			},
+		},
+		{
+			"127.0.0.1:1234",
+			[]serverString{
+				{"", "tcp", "127.0.0.1:1234"},
+			},
+		},
+		{
 			"{somewhere}/path/to/socket tcp:address:port",
 			[]serverString{
 				{"somewhere", "unix", "/path/to/socket"},
