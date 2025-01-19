@@ -20,6 +20,7 @@ type PlaybackStream struct {
 	requested   int
 	request     chan int
 	started     chan bool
+	closeCh     chan struct{}
 
 	events        chan struct{}
 	eventsLock    sync.Mutex
@@ -86,6 +87,7 @@ func (c *Client) NewPlayback(r Reader, opts ...PlaybackOption) (*PlaybackStream,
 	p.back = make([]byte, p.createReply.BufferMaxLength)
 	p.request = make(chan int)
 	p.started = make(chan bool)
+	p.closeCh = make(chan struct{})
 	c.mu.Lock()
 	c.playback[p.index] = p
 	c.mu.Unlock()
@@ -193,7 +195,11 @@ func (p *PlaybackStream) Start() {
 		p.request <- int(p.createReply.BufferTargetLength)
 		p.underflow = false
 		p.c.c.Request(&proto.CorkPlaybackStream{StreamIndex: p.index, Corked: false}, nil)
-		<-p.started
+
+		select {
+		case <-p.started:
+		case <-p.closeCh:
+		}
 	}
 }
 
@@ -266,6 +272,8 @@ func (p *PlaybackStream) SetVolume(volumes proto.ChannelVolumes) error {
 // Close closes the stream.
 func (p *PlaybackStream) Close() {
 	if !p.Closed() {
+		close(p.closeCh)
+
 		p.c.c.Request(&proto.DeletePlaybackStream{StreamIndex: p.index}, nil)
 		p.state = closed
 		close(p.request)
