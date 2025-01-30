@@ -133,7 +133,7 @@ func (p *PlaybackStream) handleEvents(events chan struct{}) {
 		// the sink input information.
 		reply := proto.GetSinkInputInfoReply{}
 		err := p.c.c.Request(&proto.GetSinkInputInfo{
-			SinkInputIndex: p.createReply.SinkInputIndex,
+			SinkInputIndex: p.index,
 		}, &reply)
 		if err != nil {
 			if p.Closed() {
@@ -232,7 +232,7 @@ func (p *PlaybackStream) Drain() {
 func (p *PlaybackStream) Volume() (proto.ChannelVolumes, error) {
 	reply := proto.GetSinkInputInfoReply{}
 	err := p.c.c.Request(&proto.GetSinkInputInfo{
-		SinkInputIndex: p.createReply.SinkInputIndex,
+		SinkInputIndex: p.index,
 	}, &reply)
 	if err != nil {
 		return nil, err
@@ -256,7 +256,7 @@ func (p *PlaybackStream) Volume() (proto.ChannelVolumes, error) {
 // mixer.
 func (p *PlaybackStream) SetVolume(volumes proto.ChannelVolumes) error {
 	return p.c.c.Request(&proto.SetSinkInputVolume{
-		SinkInputIndex: p.createReply.SinkInputIndex,
+		SinkInputIndex: p.index,
 		ChannelVolumes: volumes,
 	}, nil)
 }
@@ -327,7 +327,7 @@ func (p *PlaybackStream) StreamIndex() uint32 {
 }
 
 func (p *PlaybackStream) StreamInputIndex() uint32 {
-	return p.createReply.SinkInputIndex
+	return p.index
 }
 
 // A PlaybackOption supplies configuration when creating streams.

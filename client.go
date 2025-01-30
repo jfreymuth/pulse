@@ -102,13 +102,15 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 			c.mu.Lock()
 			for _, p := range c.playback {
 				p.err = ErrConnectionClosed
+				c.mu.Unlock()
 				p.Close()
+				c.mu.Lock()
 			}
 			for _, r := range c.record {
 				r.err = ErrConnectionClosed
 				r.state = serverLost
 			}
-			c.playback = make(map[uint32]*PlaybackStream)
+
 			c.record = make(map[uint32]*RecordStream)
 			c.mu.Unlock()
 			c.conn.Close()
