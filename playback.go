@@ -264,8 +264,10 @@ func (p *PlaybackStream) SetVolume(volumes proto.ChannelVolumes) error {
 // Close closes the stream.
 func (p *PlaybackStream) Close() {
 	if !p.Closed() {
-		p.c.c.Request(&proto.DeletePlaybackStream{StreamIndex: p.index}, nil)
 		p.state.Store(int32(closed))
+
+		p.c.c.Request(&proto.DeletePlaybackStream{StreamIndex: p.index}, nil)
+
 		close(p.request)
 
 		close(p.started)
