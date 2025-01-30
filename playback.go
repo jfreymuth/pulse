@@ -263,9 +263,7 @@ func (p *PlaybackStream) SetVolume(volumes proto.ChannelVolumes) error {
 
 // Close closes the stream.
 func (p *PlaybackStream) Close() {
-	if !p.Closed() {
-		p.state.Store(int32(closed))
-
+	if p.state.CompareAndSwap(int32(running), int32(closed)) || p.state.CompareAndSwap(int32(paused), int32(closed)) || p.state.CompareAndSwap(int32(idle), int32(closed)) {
 		p.c.c.Request(&proto.DeletePlaybackStream{StreamIndex: p.index}, nil)
 
 		close(p.request)
@@ -285,8 +283,7 @@ func (p *PlaybackStream) Close() {
 
 // Closed returns wether the stream was closed.
 func (p *PlaybackStream) Closed() bool {
-	lstate := streamState(p.state.Load())
-	return lstate == closed || lstate == serverLost
+	return streamState(p.state.Load()) == closed
 }
 
 // Running returns wether the stream is currently playing.

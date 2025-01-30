@@ -101,9 +101,8 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 		case *proto.ConnectionClosed:
 			c.mu.Lock()
 			for _, p := range c.playback {
-				close(p.request)
 				p.err = ErrConnectionClosed
-				p.state.Store(int32(serverLost))
+				p.Close()
 			}
 			for _, r := range c.record {
 				r.err = ErrConnectionClosed
