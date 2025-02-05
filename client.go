@@ -100,18 +100,20 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 			}
 		case *proto.ConnectionClosed:
 			c.mu.Lock()
+
 			for _, p := range c.playback {
 				p.err = ErrConnectionClosed
-				c.mu.Unlock()
-				p.Close()
-				c.mu.Lock()
+				p.closeInternal()
 			}
+			c.playback = make(map[uint32]*PlaybackStream)
+
 			for _, r := range c.record {
 				r.err = ErrConnectionClosed
 				r.state = serverLost
 			}
 
 			c.record = make(map[uint32]*RecordStream)
+
 			c.mu.Unlock()
 			c.conn.Close()
 		case *proto.SubscribeEvent:

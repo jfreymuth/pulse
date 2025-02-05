@@ -261,8 +261,7 @@ func (p *PlaybackStream) SetVolume(volumes proto.ChannelVolumes) error {
 	}, nil)
 }
 
-// Close closes the stream.
-func (p *PlaybackStream) Close() {
+func (p *PlaybackStream) closeInternal() bool {
 	if p.state.CompareAndSwap(int32(running), int32(closed)) || p.state.CompareAndSwap(int32(paused), int32(closed)) || p.state.CompareAndSwap(int32(idle), int32(closed)) {
 		p.c.c.Request(&proto.DeletePlaybackStream{StreamIndex: p.index}, nil)
 
@@ -270,14 +269,23 @@ func (p *PlaybackStream) Close() {
 
 		close(p.started)
 
-		p.c.mu.Lock()
-		delete(p.c.playback, p.index)
-		p.c.mu.Unlock()
-
 		p.eventsLock.Lock()
 		close(p.events)
 		p.events = nil
 		p.eventsLock.Unlock()
+
+		return true
+	}
+
+	return false
+}
+
+// Close closes the stream.
+func (p *PlaybackStream) Close() {
+	if p.closeInternal() {
+		p.c.mu.Lock()
+		delete(p.c.playback, p.index)
+		p.c.mu.Unlock()
 	}
 }
 
