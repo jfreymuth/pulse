@@ -16,9 +16,8 @@ type PlaybackStream struct {
 	underflow bool
 	err       error
 
-	front, back []byte
-	request     chan int
-	started     chan bool
+	request chan int
+	started chan bool
 
 	events        chan struct{}
 	eventsLock    sync.Mutex
@@ -81,8 +80,6 @@ func (c *Client) NewPlayback(r Reader, opts ...PlaybackOption) (*PlaybackStream,
 		return nil, err
 	}
 	p.index = p.createReply.StreamIndex
-	p.front = make([]byte, p.createReply.BufferMaxLength)
-	p.back = make([]byte, p.createReply.BufferMaxLength)
 	p.request = make(chan int)
 	p.started = make(chan bool)
 	c.mu.Lock()
@@ -94,17 +91,20 @@ func (c *Client) NewPlayback(r Reader, opts ...PlaybackOption) (*PlaybackStream,
 
 func (p *PlaybackStream) run() {
 	requested := 0
+	front := make([]byte, p.createReply.BufferMaxLength)
+	back := make([]byte, p.createReply.BufferMaxLength)
+
 	for n := range p.request {
 		if p.state != running {
 			continue
 		}
 		requested += n
 		for requested > 0 {
-			readCount, err := p.r.Read(p.front[:requested])
+			readCount, err := p.r.Read(front[:requested])
 			if readCount > 0 {
-				p.c.c.Send(p.index, p.front[:readCount])
+				p.c.c.Send(p.index, front[:readCount])
 				requested -= readCount
-				p.front, p.back = p.back, p.front
+				front, back = back, front
 			}
 			if err != nil {
 				if err != EndOfData {
