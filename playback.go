@@ -113,9 +113,10 @@ func (p *PlaybackStream) run() {
 				requested -= readCount
 				front, back = back, front
 			}
+
 			select {
-			case readCount = <-p.request:
-				requested += readCount
+			case nextBufferLength := <-p.request:
+				requested += nextBufferLength
 			default:
 			}
 		}
