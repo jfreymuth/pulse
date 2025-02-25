@@ -101,17 +101,17 @@ func (p *PlaybackStream) run() {
 		requested += n
 		for requested > 0 {
 			readCount, err := p.r.Read(front[:requested])
-			if readCount > 0 {
-				p.c.c.Send(p.index, front[:readCount])
-				requested -= readCount
-				front, back = back, front
-			}
 			if err != nil {
 				if err != EndOfData {
 					p.err = err
 				}
 				p.state = idle
 				break
+			}
+			if readCount > 0 {
+				p.c.c.Send(p.index, front[:readCount])
+				requested -= readCount
+				front, back = back, front
 			}
 			select {
 			case readCount = <-p.request:
