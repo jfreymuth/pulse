@@ -94,11 +94,11 @@ func (p *PlaybackStream) run() {
 	front := make([]byte, p.createReply.BufferMaxLength)
 	back := make([]byte, p.createReply.BufferMaxLength)
 
-	for n := range p.request {
+	for bufferLength := range p.request {
 		if p.state != running {
 			continue
 		}
-		requested += n
+		requested += bufferLength
 		for requested > 0 {
 			readCount, err := p.r.Read(front[:requested])
 			if err != nil {
