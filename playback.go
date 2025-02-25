@@ -17,7 +17,6 @@ type PlaybackStream struct {
 	err       error
 
 	front, back []byte
-	requested   int
 	request     chan int
 	started     chan bool
 
@@ -94,16 +93,17 @@ func (c *Client) NewPlayback(r Reader, opts ...PlaybackOption) (*PlaybackStream,
 }
 
 func (p *PlaybackStream) run() {
+	requested := 0
 	for n := range p.request {
 		if p.state != running {
 			continue
 		}
-		p.requested += n
-		for p.requested > 0 {
-			n, err := p.r.Read(p.front[:p.requested])
+		requested += n
+		for requested > 0 {
+			n, err := p.r.Read(p.front[:requested])
 			if n > 0 {
 				p.c.c.Send(p.index, p.front[:n])
-				p.requested -= n
+				requested -= n
 				p.front, p.back = p.back, p.front
 			}
 			if err != nil {
@@ -115,7 +115,7 @@ func (p *PlaybackStream) run() {
 			}
 			select {
 			case n = <-p.request:
-				p.requested += n
+				requested += n
 			default:
 			}
 		}
