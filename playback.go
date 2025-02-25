@@ -100,10 +100,10 @@ func (p *PlaybackStream) run() {
 		}
 		requested += n
 		for requested > 0 {
-			n, err := p.r.Read(p.front[:requested])
-			if n > 0 {
-				p.c.c.Send(p.index, p.front[:n])
-				requested -= n
+			readCount, err := p.r.Read(p.front[:requested])
+			if readCount > 0 {
+				p.c.c.Send(p.index, p.front[:readCount])
+				requested -= readCount
 				p.front, p.back = p.back, p.front
 			}
 			if err != nil {
@@ -114,8 +114,8 @@ func (p *PlaybackStream) run() {
 				break
 			}
 			select {
-			case n = <-p.request:
-				requested += n
+			case readCount = <-p.request:
+				requested += readCount
 			default:
 			}
 		}
