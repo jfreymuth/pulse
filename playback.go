@@ -276,8 +276,10 @@ func (p *PlaybackStream) Close() {
 		p.c.mu.Unlock()
 
 		p.eventsLock.Lock()
-		close(p.events)
-		p.events = nil
+		if p.events != nil {
+			close(p.events)
+			p.events = nil
+		}
 		p.eventsLock.Unlock()
 	}
 }
