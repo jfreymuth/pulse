@@ -29,8 +29,15 @@ const (
 	ErrMissingImplementation
 	ErrClientForked
 	ErrInputOutputError
-	ErrDeviceOrEesourceBusy
+	ErrDeviceOrResourceBusy
 )
+
+// ErrDeviceOrEesourceBusy is the original (misspelled) name of
+// ErrDeviceOrResourceBusy. Kept as an alias so existing callers do not
+// break; prefer ErrDeviceOrResourceBusy in new code.
+//
+// Deprecated: use ErrDeviceOrResourceBusy.
+const ErrDeviceOrEesourceBusy = ErrDeviceOrResourceBusy
 
 func (e Error) Error() string {
 	switch e {
@@ -86,7 +93,7 @@ func (e Error) Error() string {
 		return "pulseaudio: client forked"
 	case ErrInputOutputError:
 		return "pulseaudio: input/output error"
-	case ErrDeviceOrEesourceBusy:
+	case ErrDeviceOrResourceBusy:
 		return "pulseaudio: device or resource busy"
 	}
 	return "pulseaudio: invalid error code"
