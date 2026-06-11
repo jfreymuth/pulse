@@ -29,7 +29,7 @@ const (
 	ErrMissingImplementation
 	ErrClientForked
 	ErrInputOutputError
-	ErrDeviceOrEesourceBusy
+	ErrDeviceOrResourceBusy
 )
 
 func (e Error) Error() string {
@@ -86,7 +86,7 @@ func (e Error) Error() string {
 		return "pulseaudio: client forked"
 	case ErrInputOutputError:
 		return "pulseaudio: input/output error"
-	case ErrDeviceOrEesourceBusy:
+	case ErrDeviceOrResourceBusy:
 		return "pulseaudio: device or resource busy"
 	}
 	return "pulseaudio: invalid error code"
