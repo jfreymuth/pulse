@@ -226,7 +226,7 @@ func (c *Client) error(err error) {
 	for _, r := range r {
 		r.reply <- err
 	}
-	if errors.Is(err, io.EOF) {
+	if errors.Is(err, io.EOF) && c.Callback != nil {
 		c.Callback(&ConnectionClosed{})
 	}
 }
