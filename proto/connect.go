@@ -162,7 +162,7 @@ func parseOneServerString(s string) (serverString, bool) {
 
 func defaultServerStrings() []serverString {
 	switch runtime.GOOS {
-	case "linux":
+	case "dragonfly", "freebsd", "linux", "netbsd", "openbsd":
 		return []serverString{{protocol: "unix",
 			addr: path.Join(os.Getenv("XDG_RUNTIME_DIR"), "pulse/native"),
 		}}
