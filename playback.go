@@ -97,6 +97,7 @@ func (p *PlaybackStream) run() {
 
 	for bufferLength := range p.request {
 		if !p.state.is(running) {
+			requested = 0
 			continue
 		}
 		requested += bufferLength
@@ -108,6 +109,7 @@ func (p *PlaybackStream) run() {
 					p.err = err
 				}
 				p.state.set(idle)
+				requested = 0
 				break
 			}
 			if readCount > 0 {
