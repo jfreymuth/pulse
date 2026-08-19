@@ -123,9 +123,15 @@ const (
 	OpDisableSRBChannel = 102
 
 	OpRegisterMemfdShmid = 103
+
+	OpSendObjectMessage = 104
 )
 
 type RequestArgs interface{ command() uint32 }
+
+// versioned requests are only sent when the negotiated protocol version is
+// high enough, since older servers drop the connection on unknown commands.
+type versioned interface{ minVersion() Version }
 type Reply interface{ IsReplyTo() uint32 }
 
 type CreatePlaybackStream struct {
@@ -805,6 +811,19 @@ type SetPortLatencyOffset struct {
 	Offset    int64
 }
 
+// SendObjectMessage sends a message to an object that registered a message
+// handler (e.g. "/card/<name>/bluez" or "/core"). Parameters is an optional
+// JSON-encoded string. Requires protocol version 35.
+type SendObjectMessage struct {
+	ObjectPath string
+	Message    string
+	Parameters string
+}
+
+type SendObjectMessageReply struct {
+	Response string
+}
+
 func (*CreatePlaybackStream) command() uint32           { return OpCreatePlaybackStream }
 func (*DeletePlaybackStream) command() uint32           { return OpDeletePlaybackStream }
 func (*CreateRecordStream) command() uint32             { return OpCreateRecordStream }
@@ -883,6 +902,8 @@ func (*SetSourcePort) command() uint32                  { return OpSetSourcePort
 func (*SetSourceOutputVolume) command() uint32          { return OpSetSourceOutputVolume }
 func (*SetSourceOutputMute) command() uint32            { return OpSetSourceOutputMute }
 func (*SetPortLatencyOffset) command() uint32           { return OpSetPortLatencyOffset }
+func (*SendObjectMessage) command() uint32              { return OpSendObjectMessage }
+func (*SendObjectMessage) minVersion() Version          { return 35 }
 
 func (*CreatePlaybackStreamReply) IsReplyTo() uint32        { return OpCreatePlaybackStream }
 func (*CreateRecordStreamReply) IsReplyTo() uint32          { return OpCreateRecordStream }
@@ -914,6 +935,7 @@ func (*SetPlaybackStreamBufferAttrReply) IsReplyTo() uint32 { return OpSetPlayba
 func (*SetRecordStreamBufferAttrReply) IsReplyTo() uint32   { return OpSetRecordStreamBufferAttr }
 func (*GetCardInfoReply) IsReplyTo() uint32                 { return OpGetCardInfo }
 func (*GetCardInfoListReply) IsReplyTo() uint32             { return OpGetCardInfoList }
+func (*SendObjectMessageReply) IsReplyTo() uint32           { return OpSendObjectMessage }
 
 // SERVER -> CLIENT MESSAGES
 
