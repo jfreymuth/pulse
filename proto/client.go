@@ -49,7 +49,7 @@ func (c *Client) Open(rw io.ReadWriter) {
 	//c.r.r = io.TeeReader(rw, debug)
 	c.r.r = bufio.NewReader(rw)
 	c.w.w = rw
-	c.v = Version(32)
+	c.v = Version(35)
 
 	c.awaitReply = make(map[uint32]AwaitReply)
 	go c.readLoop()
@@ -63,6 +63,9 @@ type AwaitReply struct {
 func (c *Client) Request(req RequestArgs, rpl Reply) error {
 	if rpl != nil && req.command() != rpl.IsReplyTo() {
 		panic("pulse: wrong reply type")
+	}
+	if v, ok := req.(versioned); ok && c.v.Version() < v.minVersion().Version() {
+		return ErrNotSupported
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
