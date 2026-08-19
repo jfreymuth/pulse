@@ -391,10 +391,12 @@ type GetSinkInfoReply struct {
 	CardIndex      uint32 "15"
 
 	Ports []struct {
-		Name        string
-		Description string
-		Priority    uint32
-		Available   uint32 "24"
+		Name              string
+		Description       string
+		Priority          uint32
+		Available         uint32 "24"
+		AvailabilityGroup string "34"
+		Type              uint32 "34"
 	} "16"
 	ActivePortName string "16"
 
@@ -429,10 +431,12 @@ type GetSourceInfoReply struct {
 	CardIndex      uint32 "15"
 
 	Ports []struct {
-		Name        string
-		Description string
-		Priority    uint32
-		Available   uint32 "24"
+		Name              string
+		Description       string
+		Priority          uint32
+		Available         uint32 "24"
+		AvailabilityGroup string "34"
+		Type              uint32 "34"
 	} "16"
 	ActivePortName string "16"
 
@@ -477,7 +481,9 @@ type GetCardInfoReply struct {
 		Profiles    []struct {
 			Name string
 		}
-		LatencyOffset int64 "27"
+		LatencyOffset     int64  "27"
+		AvailabilityGroup string "34"
+		Type              uint32 "34"
 	} "26"
 }
 
