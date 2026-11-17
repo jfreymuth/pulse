@@ -15,6 +15,7 @@ type PlaybackStream struct {
 	state     *stateMachine
 	underflow bool
 	err       error
+	errMu     sync.Mutex
 
 	request chan int
 	started chan bool
@@ -106,7 +107,7 @@ func (p *PlaybackStream) run() {
 			readCount, err := p.r.Read(front[:requested])
 			if err != nil {
 				if err != EndOfData {
-					p.err = err
+					p.setError(err)
 				}
 				p.state.set(idle)
 				requested = 0
@@ -201,7 +202,7 @@ func (p *PlaybackStream) Start() {
 	if p.state.is(idle) {
 		p.c.c.Request(&proto.FlushPlaybackStream{StreamIndex: p.index}, nil)
 		p.state.set(running)
-		p.err = nil
+		p.setError(nil)
 		p.request <- int(p.createReply.BufferTargetLength)
 		p.underflow = false
 		p.c.c.Request(&proto.CorkPlaybackStream{StreamIndex: p.index, Corked: false}, nil)
@@ -307,7 +308,17 @@ func (p *PlaybackStream) Running() bool { return p.state.is(running) }
 func (p *PlaybackStream) Underflow() bool { return p.underflow }
 
 // Error returns the last error returned by the stream's reader.
-func (p *PlaybackStream) Error() error { return p.err }
+func (p *PlaybackStream) Error() error {
+	p.errMu.Lock()
+	defer p.errMu.Unlock()
+	return p.err
+}
+
+func (p *PlaybackStream) setError(err error) {
+	p.errMu.Lock()
+	p.err = err
+	p.errMu.Unlock()
+}
 
 // SampleRate returns the stream's sample rate (samples per second).
 func (p *PlaybackStream) SampleRate() int {
