@@ -1,13 +1,211 @@
+//go:build integration
 // +build integration
 
 package pulse
 
 import (
+	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/jfreymuth/pulse"
 )
+
+func TestPlaybackStartWithEmptySource(t *testing.T) {
+	client, err := pulse.NewClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	stream, err := client.NewPlayback(pulse.Int16Reader(func([]int16) (int, error) {
+		return 0, pulse.EndOfData
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stream.Close()
+
+	// Each start must observe the result for its own prebuffer attempt.
+	for i := 0; i < 2; i++ {
+		startPlayback(t, stream)
+		if stream.Running() || stream.Error() != nil {
+			t.Fatalf("after EndOfData: running=%t, error=%v", stream.Running(), stream.Error())
+		}
+	}
+}
+
+func beginPlayback(stream *pulse.PlaybackStream) <-chan struct{} {
+	done := make(chan struct{})
+	go func() {
+		stream.Start()
+		close(done)
+	}()
+	return done
+}
+
+// Bound startup independently of the go test timeout so a broken start
+// identifies the failing transition.
+func startPlayback(t *testing.T, stream *pulse.PlaybackStream) {
+	t.Helper()
+	done := beginPlayback(stream)
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("playback Start did not return")
+	}
+}
+
+func TestPlaybackStartAfterPartialBuffer(t *testing.T) {
+	failure := errors.New("test reader failed")
+	for _, tc := range []struct {
+		name             string
+		readErr, wantErr error
+	}{
+		{"end_of_data", pulse.EndOfData, nil},
+		{"reader_error", failure, failure},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			testPlaybackRetry(t, tc.readErr, tc.wantErr)
+		})
+	}
+}
+
+func testPlaybackRetry(t *testing.T, readErr, wantErr error) {
+	t.Helper()
+	client, err := pulse.NewClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	// Listen for the square wave from the second start. The partial buffer
+	// from the first start contains silence.
+	heard := make(chan struct{}, 1)
+	record, err := client.NewRecord(pulse.Int16Writer(func(in []int16) (int, error) {
+		for _, sample := range in {
+			if sample == 1000 || sample == -1000 {
+				select {
+				case heard <- struct{}{}:
+				default:
+				}
+				break
+			}
+		}
+		return len(in), nil
+	}), pulse.RecordBufferFragmentSize(256))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer record.Close()
+	record.Start()
+
+	reads := 0
+	gen := &sampleWaveGenerator{}
+	stream, err := client.NewPlayback(pulse.Int16Reader(func(out []int16) (int, error) {
+		reads++
+		switch reads {
+		case 1:
+			out[0] = 0
+			return 1, nil
+		case 2:
+			return 0, readErr
+		default:
+			return gen.generate(out)
+		}
+	}), pulse.PlaybackBufferSize(256))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stream.Close()
+
+	startPlayback(t, stream)
+	if stream.Running() || stream.Error() != wantErr {
+		t.Fatalf("after partial buffer: running=%t, error=%v", stream.Running(), stream.Error())
+	}
+	startPlayback(t, stream)
+	if !stream.Running() || stream.Error() != nil {
+		t.Fatalf("after restart: running=%t, error=%v", stream.Running(), stream.Error())
+	}
+	select {
+	case <-heard:
+	case <-time.After(5 * time.Second):
+		t.Fatal("no generated audio recorded after restarting the same stream")
+	}
+
+	// Resume can generate another Started notification on the same stream.
+	// A subsequent request must still get a reply from the protocol loop.
+	stream.Pause()
+	stream.Resume()
+	if !stream.Running() {
+		t.Fatal("stream did not resume after retry")
+	}
+	if _, err := stream.Volume(); err != nil {
+		t.Fatalf("after resume: %v", err)
+	}
+}
+
+func TestStopDuringPlaybackStart(t *testing.T) {
+	client, err := pulse.NewClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	entered := make(chan struct{})
+	readCtx, release := context.WithCancel(context.Background())
+	firstRead := true
+	stream, err := client.NewPlayback(pulse.Int16Reader(func(out []int16) (int, error) {
+		if firstRead {
+			firstRead = false
+			close(entered)
+			<-readCtx.Done()
+			return 0, pulse.EndOfData
+		}
+		return len(out), nil
+	}), pulse.PlaybackBufferSize(256))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stream.Close()
+	defer release()
+
+	done := beginPlayback(stream)
+	select {
+	case <-entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("reader did not start prebuffering")
+	}
+	stream.Stop()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Stop left Start waiting for the server")
+	}
+	if stream.Running() {
+		t.Fatal("stopped stream is still running")
+	}
+
+	restarted := beginPlayback(stream)
+	deadline := time.Now().Add(5 * time.Second)
+	for !stream.Running() {
+		if time.Now().After(deadline) {
+			t.Fatal("second startup did not enter prebuffering")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	// Complete the old read only after the new startup has claimed the stream.
+	release()
+	select {
+	case <-restarted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("second startup did not complete")
+	}
+	if !stream.Running() {
+		t.Fatal("old reader completion stopped the new playback")
+	}
+}
 
 func TestLoopback(t *testing.T) {
 	var buf []int16
