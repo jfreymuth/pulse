@@ -17,7 +17,7 @@ type PlaybackStream struct {
 	err       error
 
 	request chan int
-	started chan bool
+	started chan struct{} // pending Start, guarded by state.lock
 
 	events        chan struct{}
 	eventsLock    sync.Mutex
@@ -82,7 +82,6 @@ func (c *Client) NewPlayback(r Reader, opts ...PlaybackOption) (*PlaybackStream,
 	p.index = p.createReply.StreamIndex
 	p.state = newStateMachine()
 	p.request = make(chan int)
-	p.started = make(chan bool)
 	c.mu.Lock()
 	c.playback[p.index] = p
 	c.mu.Unlock()
@@ -108,7 +107,10 @@ func (p *PlaybackStream) run() {
 				if err != EndOfData {
 					p.err = err
 				}
-				p.state.set(idle)
+				p.state.lock.Lock()
+				p.state.state = idle
+				p.finishStartLocked()
+				p.state.lock.Unlock()
 				requested = 0
 				break
 			}
@@ -196,16 +198,33 @@ func (p *PlaybackStream) handleEvents(events chan struct{}) {
 	close(p.volumeChanges)
 }
 
+// Either a server Started event or a reader that ends during prebuffering
+// completes the pending start. Later notifications have no waiter.
+func (p *PlaybackStream) finishStartLocked() {
+	if p.started != nil {
+		close(p.started)
+		p.started = nil
+	}
+}
+
 // Start starts playing audio.
 func (p *PlaybackStream) Start() {
 	if p.state.is(idle) {
 		p.c.c.Request(&proto.FlushPlaybackStream{StreamIndex: p.index}, nil)
-		p.state.set(running)
+		started := make(chan struct{})
+		p.state.lock.Lock()
+		if p.state.state != idle {
+			p.state.lock.Unlock()
+			return
+		}
+		p.started = started
+		p.state.state = running
+		p.state.lock.Unlock()
 		p.err = nil
 		p.request <- int(p.createReply.BufferTargetLength)
 		p.underflow = false
 		p.c.c.Request(&proto.CorkPlaybackStream{StreamIndex: p.index, Corked: false}, nil)
-		<-p.started
+		<-started
 	}
 }
 

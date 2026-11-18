@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 package pulse
@@ -8,6 +9,39 @@ import (
 
 	"github.com/jfreymuth/pulse"
 )
+
+func TestPlaybackStartWithEmptySource(t *testing.T) {
+	client, err := pulse.NewClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	stream, err := client.NewPlayback(pulse.Int16Reader(func([]int16) (int, error) {
+		return 0, pulse.EndOfData
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stream.Close()
+
+	// Each start must observe the result for its own prebuffer attempt.
+	for i := 0; i < 2; i++ {
+		done := make(chan struct{})
+		go func() {
+			stream.Start()
+			close(done)
+		}()
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			t.Fatalf("Start %d still waiting after EndOfData", i+1)
+		}
+		if stream.Running() || stream.Error() != nil {
+			t.Fatalf("after EndOfData: running=%t, error=%v", stream.Running(), stream.Error())
+		}
+	}
+}
 
 func TestLoopback(t *testing.T) {
 	var buf []int16
