@@ -17,7 +17,7 @@ type PlaybackStream struct {
 	err       error
 
 	request chan int
-	started chan struct{} // pending Start, guarded by state.lock
+	started chan struct{} // identifies this start even after completion; guarded by state.lock
 
 	events        chan struct{}
 	eventsLock    sync.Mutex
@@ -102,14 +102,21 @@ func (p *PlaybackStream) run() {
 		requested += bufferLength
 		for requested > 0 {
 			front, back = ensurePlaybackBuffers(front, back, requested)
+			// Stop may be followed by a new Start while the reader is still
+			// returning the last buffer from the previous start.
+			p.state.lock.RLock()
+			started := p.started
+			p.state.lock.RUnlock()
 			readCount, err := p.r.Read(front[:requested])
 			if err != nil {
-				if err != EndOfData {
-					p.err = err
-				}
 				p.state.lock.Lock()
-				p.state.state = idle
-				p.finishStartLocked()
+				if p.started == started && p.state.state != closed && p.state.state != serverLost {
+					if err != EndOfData {
+						p.err = err
+					}
+					p.state.state = idle
+					p.finishStartLocked()
+				}
 				p.state.lock.Unlock()
 				requested = 0
 				break
@@ -198,12 +205,16 @@ func (p *PlaybackStream) handleEvents(events chan struct{}) {
 	close(p.volumeChanges)
 }
 
-// Either a server Started event or a reader that ends during prebuffering
-// completes the pending start. Later notifications have no waiter.
+// A server acknowledgement, a reader ending, or an explicit stop can
+// complete Start. These can arrive in any order.
 func (p *PlaybackStream) finishStartLocked() {
-	if p.started != nil {
+	if p.started == nil {
+		return
+	}
+	select {
+	case <-p.started:
+	default:
 		close(p.started)
-		p.started = nil
 	}
 }
 
@@ -219,8 +230,8 @@ func (p *PlaybackStream) Start() {
 		}
 		p.started = started
 		p.state.state = running
-		p.state.lock.Unlock()
 		p.err = nil
+		p.state.lock.Unlock()
 		p.request <- int(p.createReply.BufferTargetLength)
 		p.underflow = false
 		p.c.c.Request(&proto.CorkPlaybackStream{StreamIndex: p.index, Corked: false}, nil)
@@ -231,8 +242,11 @@ func (p *PlaybackStream) Start() {
 // Stop stops playing audio; the callback will no longer be called.
 // If the buffer size/latency is large, audio may continue to play for some time after the call to Stop.
 func (p *PlaybackStream) Stop() {
-	if p.state.is(running, paused) {
-		p.state.set(idle)
+	p.state.lock.Lock()
+	defer p.state.lock.Unlock()
+	if p.state.state == running || p.state.state == paused {
+		p.state.state = idle
+		p.finishStartLocked()
 	}
 }
 
