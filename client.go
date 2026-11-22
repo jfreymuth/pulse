@@ -102,7 +102,7 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 			c.mu.Lock()
 			for _, p := range c.playback {
 				close(p.request)
-				p.err = ErrConnectionClosed
+				p.setError(ErrConnectionClosed)
 				p.state.set(serverLost)
 			}
 			for _, r := range c.record {
